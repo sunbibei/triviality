@@ -3,13 +3,10 @@
 
 #include <stddef.h>
 
-void *ff_malloc(size_t size);
-void ff_free(void *ptr);
+void* ts_malloc_lock(size_t);
+void  ts_free_lock(void*);
 
-void *bf_malloc(size_t size);
-void bf_free(void *ptr);
-
-unsigned long get_data_segment_size();
-unsigned long get_data_segment_free_space_size();
+void* ts_malloc_nolock(size_t);
+void  ts_free_nolock(void*);
 
 #endif // MY_MALLOC_H_
