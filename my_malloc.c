@@ -1,111 +1,144 @@
-#include <unistd.h>
-#include <assert.h>
 #include "my_malloc.h"
+#include <unistd.h>
+#include <pthread.h>
 
-enum {_ALIGN = 8};
-#define _ROUND_UP_8(__bytes) \
-    (((__bytes) + (size_t)_ALIGN - 1) & ~((size_t)_ALIGN - 1))
+typedef struct block {
+  unsigned long size;
+  struct block *next;
+  struct block *prev;
+  int used;
+  int padding;
+}block;
 
-enum {
-  USING = 0,
-  FREE,
-};
+typedef block* block_ptr;
 
-typedef struct __Block {
-  ///! The total bytes.
-  size_t          size;
-  ///! The remainder bytes
-  size_t          remainder;
-  ///! The address of next Block
-  struct __Block *next;
-  ///! The address of prev Block
-  struct __Block *prev;
-  ///! The real starting address.
-  char            mem[0];
-} Block, *BlkPtr;
+static block           _g_head = {0, NULL, NULL, 1, 0};
+static pthread_mutex_t _g_lock = {{0}, 0};
 
-static Block __g_head         = {0, 0, NULL, NULL};
-const size_t  BLK_SIZE        = sizeof(Block);
-const size_t  EXP_MULTI       = 8;
-
-BlkPtr ask_for_mem(const size_t);
+const size_t blk_size = sizeof(block);
+#define ALLOC_SIZE (100000 * blk_size)
+void *get_mem(size_t size);
 
 void *ts_malloc_lock(size_t size) {
-  assert(size > 0);
+//  if (NULL == _g_head.next) {
+//    pthread_mutex_init(&_g_lock, NULL);
+//  }
   ///! Modify the size
-  size_t _m_size = _ROUND_UP_8(size + BLK_SIZE);
+  if (size % blk_size != 0)
+    size = ((size + blk_size) / blk_size) * blk_size;
 
-  BlkPtr idx = &__g_head;
-  BlkPtr ref = NULL; // best fit block's position
-  while (idx->next) {
-    if ((idx->next->remainder >= _m_size)
-        && ((NULL == ref) || (idx->next->remainder < ref->remainder))) {
-        ref = idx;
+  // while (0 != pthread_mutex_trylock(&_g_lock)) ;
+  pthread_mutex_lock(&_g_lock);
+
+  block_ptr p     = &_g_head;
+  block_ptr index = NULL; // best fit block's position
+  while (p->next) { // find best fit block
+    if ((p->next->used == 0) && (p->next->size >= size)
+        && ((NULL == index) || (p->next->size < index->size) )) {
+          index = p->next;
     }
-
-    idx = idx->next;
-  } // end while
-
-  ///! No availiable memery
-  if (NULL == ref) {
-    idx->next       = ask_for_mem(EXP_MULTI * _m_size);
-    idx->next->prev = idx;
-    if (NULL == idx->next) return NULL;
-
-    ///! recurse call
-    return ts_malloc_lock(_m_size);
+    p = p->next;
   }
 
-  BlkPtr _new_blk = (BlkPtr) (ref->mem + (ref->size - ref->remainder));
-  _new_blk->size      = ref->remainder - BLK_SIZE;
-  _new_blk->remainder = ref->remainder - _m_size;
-  ref->size      = ref->size - ref->remainder;
-  ref->remainder = 0;
+  if (NULL == index) { ///! No available memory
+    block_ptr new_block = get_mem(size);
+    if (new_block == NULL) return NULL;
 
-  ///! Insert the new block to list
-  _new_blk->next  = ref->next;
-  if (ref->next) ref->next->prev = _new_blk;
-  _new_blk->prev  = ref;
-  ref->next       = _new_blk;
+    p->next         = new_block;
+    new_block->prev = p;
+    index           = new_block;
+  } else if (index->size - size < 2 * blk_size) {
+    index->used = 1;
+  } else {
+    block_ptr new_block = index + 1 + size / blk_size;
+    new_block->next     = index->next;
+    if (index->next) index->next->prev = new_block;
+    new_block->prev     = index;
+    index->next         = new_block;
+    new_block->used     = 0;
+    new_block->size     = index->size - size - blk_size;
+    index->size         = size;
+    index->used         = 1;
+  }
 
-  return _new_blk->mem;
+  pthread_mutex_unlock(&_g_lock);
+  return (void*)(index + 1);
 }
 
 void ts_free_lock(void *ptr) {
+  block_ptr addr = (block_ptr)ptr - 1;
+  block_ptr p    = &_g_head;
+  // block_ptr end  = NULL;
 
-  BlkPtr ref  = &__g_head;
-  while (ref && ptr != ref->mem) ref = ref->next;
-  // not found
-  if (NULL == ref) return;
+  // while (0 != pthread_mutex_trylock(&_g_lock)) ;
+  pthread_mutex_lock(&_g_lock);
+
+  while (p->next && p->next != addr) p = p->next;
+  if (!p->next) return; // not found
 
   ///! take back the memory.
-  ref->remainder = ref->size;
+  addr->used = 0;
 
+  block_ptr ref = p->next;
   // merge to the left block
-  while ((NULL != ref->prev) && (ref->prev->size == ref->prev->remainder)) {
-    ref->prev->size      += (ref->size + BLK_SIZE);
-    ref->prev->remainder += (ref->size + BLK_SIZE);
+  while ((NULL != ref->prev) && (0 == ref->prev->used)) {
+    ref->prev->size      += (ref->size + blk_size);
     ref->prev->next       = ref->next;
     if (ref->next) ref->next->prev = ref->prev;
     ref = ref->prev;
   }
 
   // merge to the right block
-  while ((NULL != ref->next) && (ref->next->size == ref->next->remainder)) {
-    ref->size      += (ref->next->size + BLK_SIZE);
-    ref->remainder += (ref->next->size + BLK_SIZE);
+  while ((NULL != ref->next) && (0 == ref->next->used)) {
+    ref->size      += (ref->next->size + blk_size);
     ref->next       =  ref->next->next;
     if (ref->next)     ref->next->prev = ref;
   }
+  pthread_mutex_unlock(&_g_lock);
+///! It's not necessary.
+//  if (end && end->next == NULL) {
+//    brk(end);
+//
+//    p = head;
+//    while (p->next && p->next != end)
+//      p = p->next;
+//
+//    p->next = NULL;
+//  }
 }
 
-BlkPtr ask_for_mem(const size_t ALLOC_SIZE) {
-  BlkPtr _new_mem = sbrk(ALLOC_SIZE);
-  if (_new_mem == (void*)-1) return NULL;
+void* ts_malloc_nolock(size_t s) {
+  return (void*)NULL;
+}
 
-  _new_mem->prev       = NULL;
-  _new_mem->next       = NULL;
-  _new_mem->size       = ALLOC_SIZE;
-  _new_mem->remainder  = ALLOC_SIZE;
-  return _new_mem;
+void  ts_free_nolock(void* p) {
+  return;
+}
+
+void *get_mem(size_t size) {
+  unsigned long alloc_size = size + blk_size;
+  if (alloc_size < ALLOC_SIZE) alloc_size = ALLOC_SIZE;
+
+  block_ptr p = sbrk(0);
+  if (sbrk(alloc_size) == (void*)-1)
+    return NULL;
+
+  if (alloc_size - blk_size - size < 2 * blk_size) {
+    p->size = size;
+    p->next = NULL;
+    p->prev = NULL;
+    p->used = 1;
+  }
+
+  block_ptr new_block = p + 1 + size / blk_size;
+  new_block->size = alloc_size - 2 * blk_size - size;
+  new_block->next = NULL;
+  new_block->prev = p;
+  new_block->used = 0;
+
+  p->size = size;
+  p->next = new_block;
+  p->used = 1;
+
+  return (void*)p;
 }
