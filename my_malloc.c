@@ -10,14 +10,30 @@ typedef struct block {
   int padding;
 }block;
 
+typedef struct {
+  int flag;
+  int used;
+  unsigned long size;
+}BlockLockFree, *BlockLockFreePtr;
+
 typedef block* block_ptr;
 
 static block           _g_head = {0, NULL, NULL, 1, 0};
 static pthread_mutex_t _g_lock = {{0}, 0};
 
-const size_t blk_size = sizeof(block);
+static BlockLockFree   _g_head_lf = {1, 1, 0};
+const  size_t BLK_LF_SIZE = sizeof(BlockLockFree);
+
+const size_t blk_size    = sizeof(block);
+const size_t ALLOC_MULTI = 8;
+
+
 #define ALLOC_SIZE (100000 * blk_size)
 void *get_mem(size_t size);
+
+void* get_mem_lockfree(block* head, size_t size);
+
+int compare_exchange_weak(int* ptr, int oldval, int newval);
 
 void *ts_malloc_lock(size_t size) {
 //  if (NULL == _g_head.next) {
@@ -81,7 +97,7 @@ void ts_free_lock(void *ptr) {
 
   block_ptr ref = p->next;
   // merge to the left block
-  while ((NULL != ref->prev) && (0 == ref->prev->used)) {
+  if ((NULL != ref->prev) && (0 == ref->prev->used)) {
     ref->prev->size      += (ref->size + blk_size);
     ref->prev->next       = ref->next;
     if (ref->next) ref->next->prev = ref->prev;
@@ -89,7 +105,7 @@ void ts_free_lock(void *ptr) {
   }
 
   // merge to the right block
-  while ((NULL != ref->next) && (0 == ref->next->used)) {
+  if ((NULL != ref->next) && (0 == ref->next->used)) {
     ref->size      += (ref->next->size + blk_size);
     ref->next       =  ref->next->next;
     if (ref->next)     ref->next->prev = ref;
@@ -107,12 +123,42 @@ void ts_free_lock(void *ptr) {
 //  }
 }
 
-void* ts_malloc_nolock(size_t s) {
-  return (void*)NULL;
+void* ts_malloc_nolock(size_t size) {
+  ///! Modify the size
+  if (size % blk_size != 0)
+    size = ((size + blk_size) / blk_size) * blk_size;
+
+  block_ptr p     = &_g_head;
+  block_ptr index = NULL; // best fit block's position
+
+  do {
+    p     = &_g_head;
+    index = NULL;
+    while (p->next) { // find best fit block
+      if ((p->next->used == 0) && (p->next->size >= size)
+          && ((NULL == index) || (p->next->size < index->size) )) {
+        index = p->next;
+      }
+      p = p->next;
+    }
+
+    if (NULL == index) { ///! No available memory
+      return get_mem_lockfree(p, size) + blk_size;
+    }
+  } while (compare_exchange_weak(&(index->used), 0, 1));
+
+  return (void*)(index + 1);
 }
 
-void  ts_free_nolock(void* p) {
-  return;
+void  ts_free_nolock(void* ptr) {
+  block_ptr addr = (block_ptr)ptr - 1;
+  block_ptr p    = &_g_head;
+
+  while (p->next && p->next != addr) p = p->next;
+  if (!p->next) return; // not found
+
+  ///! take back the memory.
+  addr->used = 0;
 }
 
 void *get_mem(size_t size) {
@@ -141,4 +187,38 @@ void *get_mem(size_t size) {
   p->used = 1;
 
   return (void*)p;
+}
+
+void* get_mem_lockfree(block* head, size_t size) {
+  unsigned long alloc_size = size + blk_size;
+  // if (alloc_size < ALLOC_SIZE) alloc_size = ALLOC_SIZE;
+
+  pthread_mutex_lock(&_g_lock);
+  block_ptr p = sbrk(0);
+  if (sbrk(alloc_size) == (void*)-1) {
+    pthread_mutex_unlock(&_g_lock);
+    return NULL;
+  }
+  pthread_mutex_unlock(&_g_lock);
+  p->size = size;
+  p->next = NULL;
+  p->prev = head;
+  p->used = 1;
+
+  if (NULL != head->next) {
+    p->next          = head->next;
+    head->next->prev = p;
+    head->next       = p;
+  }
+
+  return (void*)p;
+}
+
+int compare_exchange_weak(int* ptr, int oldval, int newval) {
+  if (oldval == *ptr) {
+    *ptr = newval;
+    return 1;
+  }
+
+  return 0;
 }
