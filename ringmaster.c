@@ -5,7 +5,7 @@
  *      Author: bibei
  */
 
-#define MASTER
+// #define MASTER
 #ifdef  MASTER
 
 #include <stdio.h>
@@ -23,11 +23,6 @@
 const unsigned int MAX_BUF_SIZE = 1024*sizeof(char);
 
 int main(int argc, char* argv[]) {
-//  for (int i = 0; i < argc; ++i)
-//    printf("[%d/%d]: %s ", i, argc-1, argv[i]);
-//  printf("\n");
-//  return 0;
-
   if (4 != argc) {
     printf("Usage: ringmaster <port_num> <num_players> <num_hops>\n");
     return -1;
@@ -48,20 +43,16 @@ int main(int argc, char* argv[]) {
   // struct hostent* hostinfo = gethostbyname(name);
   struct hostent* hostinfo = gethostbyname(localhost);
   if (NULL == hostinfo) {
-    printf("ERROR gethostbyname\n");
+    if (__DEBUG__) printf("ERROR gethostbyname\n");
     return -1;
   }
   char *ip = inet_ntoa (*(struct in_addr *)*hostinfo->h_addr_list);
-  printf("ip: %s\n", ip);
+  if (__DEBUG__) printf("ip: %s\n", ip);
 
-  struct sockaddr_in** player_addrs = (struct sockaddr_in**)malloc(NUM_PLAYERS*sizeof(struct sockaddr_in));
-  unsigned int* length_addrs = (unsigned int*)malloc(NUM_PLAYERS*sizeof(unsigned int));
-  int* player_fds            = (int*)malloc(NUM_PLAYERS*sizeof(int));
-  for (int i = 0; i < NUM_PLAYERS; ++i) {
+  int* player_fds = (int*)malloc(NUM_PLAYERS*sizeof(int));
+  for (int i = 0; i < NUM_PLAYERS; ++i)
     player_fds[i]   = -1;
-    player_addrs[i] = NULL;
-    length_addrs[i] = 0;
-  }
+
 
   char* buf = (char*)malloc(MAX_BUF_SIZE);
   memset(buf, 0x00, MAX_BUF_SIZE);
@@ -94,51 +85,15 @@ int main(int argc, char* argv[]) {
   ///! waiting for the player connecting request.
   int num_player = 0;
   while (num_player != NUM_PLAYERS) {
-    player_addrs[num_player] = (struct sockaddr_in*) malloc(sizeof(struct sockaddr_in));
-    length_addrs[num_player] = sizeof(player_addrs[num_player]);
-    player_fds[num_player]   = accept(ringmaster_fd, (struct sockaddr*)(player_addrs[num_player]),
-        length_addrs + num_player);
+    struct sockaddr_in player_addr;
+    int addr_len = 0;
+    player_fds[num_player] = accept(ringmaster_fd, (struct sockaddr*)(&player_addr), (socklen_t*)&addr_len);
 
     __packet_init_link_msg(buf, num_player, NUM_PLAYERS);
     send(player_fds[num_player], buf, INIT0_MSG_SIZE, 0);
 
-    ++num_player;
-  }
-
-  //////////////////////////////////////////////////////
-  ///! send the RING INIT message
-  //////////////////////////////////////////////////////
-  for (num_player = 0; num_player < NUM_PLAYERS; ++num_player) {
-    int off = 0;
-    memset(buf, 0x00, MAX_BUF_SIZE);
-    ///! header
-    memcpy(buf + off, HEAD, HEAD_SIZE);
-    off += HEAD_SIZE;
-    ///! index
-    memcpy(buf + off, INDEX[INIT_RING_IDX], INDEX_SIZE);
-    off += INDEX_SIZE;
-    ///! the length of left neighbor address
-    int neighbor_id = num_player - 1;
-    if (neighbor_id < 0) neighbor_id = NUM_PLAYERS - 1;
-    memcpy(buf + off, length_addrs + neighbor_id, sizeof(int));
-    off += sizeof(int);
-    ///! the left neighbor address
-    memcpy(buf + off, player_addrs + neighbor_id, length_addrs[neighbor_id]);
-    off += length_addrs[num_player];
-
-    ///! the length of right neighbor address
-    neighbor_id = num_player + 1;
-    if (neighbor_id >= NUM_PLAYERS) neighbor_id = 0;
-    memcpy(buf + off, length_addrs + neighbor_id, sizeof(int));
-    off += sizeof(int);
-    ///! the right neighbor address
-    memcpy(buf + off, player_addrs + neighbor_id, length_addrs[neighbor_id]);
-    off += length_addrs[num_player];
-    ///! the tail
-    off += TAIL_SIZE;
-
-    send(player_fds[num_player], buf, off, 0);
     printf("Player %d is ready to play\n", num_player);
+    ++num_player;
   }
 
   ///! start to play the hot-potato
@@ -148,14 +103,29 @@ int main(int argc, char* argv[]) {
   ///! create a potato object.
   Potato* potato  = potato_malloc(0);
   potato->hops    = NUM_HOPS;
-  char* serialize = potato_serialize(potato);
-  send(player_fds[player_id], serialize, POTATO_MSG_SIZE(potato->id_size), 0);
+
+  int off = 0;
+  ///! header
+  memcpy(buf + off, HEAD, HEAD_SIZE);
+  off += HEAD_SIZE;
+  ///! index
+  memcpy(buf + off, INDEX[POTATO_IDX], INDEX_SIZE);
+  off += INDEX_SIZE;
+  ///! next id
+  memset(buf + off, 0x00, INTERGE_SIZE);
+  off += INTERGE_SIZE;
+  ///! potato serialize
+  potato_serialize(potato, buf + off);
+  off += POTATO_SERIALIZE_SIZE(potato->id_size);
+  ///! tail
+  memset(buf + off, 0x00, TAIL_SIZE);
+  off += TAIL_SIZE;
+
+  send(player_fds[player_id], buf, off, 0);
   printf("sending potato to player %d\n", player_id);
-  free(serialize);
-  serialize = NULL;
 
   //////////////////////////////////////////////////////
-  ///! waiting to the game end.
+  ///! waiting to the game end or pass to the next player.
   //////////////////////////////////////////////////////
   struct timeval timeout;
   Potato* _pp = NULL;
@@ -182,13 +152,15 @@ int main(int argc, char* argv[]) {
     }
 
     ///! read the message.
-    int total_size = 0;
+    int next_player = -1;
+    int total_size  = 0;
     memset(buf, 0, MAX_BUF_SIZE);
     while (1) { // read the message and parse a potato object.
       int num = recv(player_fds[id], buf + total_size, MAX_BUF_SIZE - total_size, 0);
       if (num <= 0) continue;
 
       total_size += num;
+      if (total_size < POTATO_MSG_SIZE(1)) continue;
       ///! find the header from the buffer and move to the head of buffer.
       num = 0;
       while (num <= total_size) {
@@ -204,28 +176,47 @@ int main(int argc, char* argv[]) {
         break;
       } // end while (num <= total_size)
 
+      ///! the num is must be zero.
       unsigned int id_size = 0;
-      memcpy(&id_size, buf + (HEAD_SIZE + INDEX_SIZE), sizeof(unsigned int));
-      if ((total_size - num) < 4*(id_size + 3)) continue;
-
+      memcpy(&id_size, buf + (HEAD_SIZE + INDEX_SIZE + sizeof(unsigned int)), sizeof(unsigned int));
+      if ((total_size - num) < POTATO_MSG_SIZE(id_size)) continue;
+      ///! eat the head and index.
+      off = HEAD_SIZE + INDEX_SIZE;
+      ///! parse the next player id.
+      next_player = -1;
+      memcpy(&next_player, buf + off, INTERGE_SIZE);
+      off += INTERGE_SIZE;
       ///! get the whole potato message.
-      _pp = potato_unserialize(buf + num);
+      _pp = potato_unserialize(buf + off);
       break;
-//      if (_pp->hops > 0) {
-//
-//        --_pp->hops;
-//        char* serialize = potato_serialize(_pp);
-//        send(player_fds[rand() % NUM_PLAYERS], serialize, POTATO_MSG_SIZE(_pp->id_size), 0);
-//
-//        free(serialize);
-//        serialize = NULL;
-//      } else if (0 == _pp->hops) {
-//        break; // end the game
-//      } else {
-//        ; // Unreached code
-//      }
     } // end while(1) -- read message
-    if (NULL != _pp) break;
+    if (_pp->hops > 0) {
+      off = 0;
+      ///! header
+      memcpy(buf + off, HEAD, HEAD_SIZE);
+      off += HEAD_SIZE;
+      ///! index
+      memcpy(buf + off, INDEX[POTATO_IDX], INDEX_SIZE);
+      off += INDEX_SIZE;
+      ///! next id
+      memset(buf + off, 0x00, INTERGE_SIZE);
+      off += INTERGE_SIZE;
+      ///! potato serialize
+      potato_serialize(_pp, buf + off);
+      off += POTATO_SERIALIZE_SIZE(_pp->id_size);
+      ///! tail
+      memset(buf + off, 0x00, TAIL_SIZE);
+      off += TAIL_SIZE;
+
+      send(player_fds[next_player], buf, off, 0);
+      ///! free the potato
+      potato_free(_pp);
+      _pp = NULL;
+    } else if (0 == _pp->hops) {
+      break;
+    } else {
+      ; // Unreached code
+    }
   } // end while(1)   -- the main process.
 
   //////////////////////////////////////////////////////
@@ -235,16 +226,7 @@ int main(int argc, char* argv[]) {
   if ((NULL == _pp) || (0 != _pp->hops))
     printf("ERROR GAME HOPS\n");
 
-  int off = 0;
-  memset(buf, 0x00, END_MSG_SIZE);
-  ///! header
-  memcpy(buf + off, HEAD, HEAD_SIZE);
-  off += HEAD_SIZE;
-  ///! index
-  memcpy(buf + off, INDEX[END_MSG_IDX], INDEX_SIZE);
-  off += INDEX_SIZE;
-  ///! the tail
-  off += TAIL_SIZE;
+  __packet_end_msg(buf);
   for (int id = 0; id < NUM_PLAYERS; ++id)
     send(player_fds[id], buf, END_MSG_SIZE, 0);
 
@@ -254,11 +236,7 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < NUM_PLAYERS; ++i) {
     FD_CLR(player_fds[i], &read_set);
     close(player_fds[i]);
-
-    free(player_addrs[i]);
   }
-  free(player_addrs);
-  free(length_addrs);
   free(player_fds);
   free(buf);
 

@@ -11,14 +11,16 @@
 #include <stdio.h>
 #include <assert.h>
 
+#define __DEBUG__ (1)
+
 /*!
  * The protocol for communication
- * |        HEADER       |  ID_SIZE |  ID_LIST  |  HOPS   |        TAIL         |
- * | 0x88 0x89 0x00 0x00 |  4bytes  |  N*4bytes |  4bytes | 0x00 0x00 0x00 0x00 |
+ * |        HEADER       |  NEXT_ID | ID_SIZE |  ID_LIST  |  HOPS   |        TAIL         |
+ * | 0x88 0x89 0x00 0x00 |  4bytes  |  4bytes |  N*4bytes |  4bytes | 0x00 0x00 0x00 0x00 |
  * The initialize link message format
  * |        HEADER       | PLAYER NO.| TOTAL NO. |        TAIL         |
  * | 0x88 0x89 0x01 0x01 |  4bytes   |  4bytes   | 0x00 0x00 0x00 0x00 |
- * The initialize ring message format
+ * The initialize ring message format (decreped)
  * |        HEADER       | LFT_ADDR_LEN | LFT_NEIGHOR_ADDR  | RGT_ADDR_LEN | RGT_NEIGHOR_ADDR |        TAIL         |
  * | 0x88 0x89 0x02 0x02 |    4bytes    |       N bytes     |    4bytes    |      N bytes     | 0x00 0x00 0x00 0x00 |
  * The end message format
@@ -26,9 +28,11 @@
  * | 0x88 0x89 0xFF 0xFF | 0x00 0x00 0x00 0x00 |
  */
 ///! MSG_SIZE: means HOPS + ID_SIZE + ID_LIST
-#define POTATO_MSG_SIZE(id_size) (((id_size) + 5)*4)
-#define INIT0_MSG_SIZE           (4 * 4)
-#define END_MSG_SIZE             (2 * 4)
+#define POTATO_MSG_SIZE(id_size)           (((id_size) + 5)*4)
+#define POTATO_SERIALIZE_SIZE(id_size)     (((id_size) + 2)*4)
+#define INTERGE_SIZE                       (sizeof(unsigned int))
+#define INIT_LINK_MSG_SIZE                 (4 * 4)
+#define END_MSG_SIZE                       (2 * 4)
 const char HEAD[] = {0x88, 0x89};
 enum {
   POTATO_IDX = 0,
@@ -43,7 +47,7 @@ const unsigned int INDEX_SIZE = 2;
 const unsigned int TAIL_SIZE  = 4;
 
 void __packet_init_link_msg(char* buf, int id, int nums);
-void __packet_init_1_msg(char* buf);
+void __packet_end_msg(char* buf);
 
 /*!
  * The prototype of Potato, and the methods.
@@ -67,6 +71,8 @@ Potato* potato_malloc(unsigned int id_size) {
 }
 
 void    potato_free(Potato* _pp) {
+  if (NULL == _pp) return;
+
   free(_pp->id_list);
   _pp->id_list = NULL;
   _pp->id_size = 0;
@@ -83,31 +89,30 @@ void potato_print_trace(const Potato* _potato) {
 }
 
 ///! The caller need to free the memory by self.
-char* potato_serialize(const Potato* _potato) {
-  unsigned int size = POTATO_MSG_SIZE(_potato->id_size);
-  char* serialize   = (char*)malloc(size);
-  memset(serialize, 0x00, size);
+void potato_serialize(const Potato* _potato, char* buf) {
+  assert(NULL != buf);
 
-  ///! header
+  unsigned int size = POTATO_SERIALIZE_SIZE(_potato->id_size);
+  memset(buf, 0x00, size);
+
   int off = 0;
-  memcpy(serialize + off, HEAD, HEAD_SIZE);
-  off += HEAD_SIZE;
-  ///! index
-  memcpy(serialize + off, INDEX[POTATO_IDX], INDEX_SIZE);
-  off += INDEX_SIZE;
+//  ///! header
+//  memcpy(buf + off, HEAD, HEAD_SIZE);
+//  off += HEAD_SIZE;
+//  ///! index
+//  memcpy(buf + off, INDEX[POTATO_IDX], INDEX_SIZE);
+//  off += INDEX_SIZE;
   ///! id size
-  memcpy(serialize + off, &(_potato->id_size), sizeof(unsigned int));
+  memcpy(buf + off, &(_potato->id_size), sizeof(unsigned int));
   off += sizeof(unsigned int);
   ///! id list
   for (int idx = 0; idx < _potato->id_size; ++idx) {
-    memcpy(serialize + off, _potato->id_list + idx, sizeof(unsigned int));
+    memcpy(buf + off, _potato->id_list + idx, sizeof(unsigned int));
     off += sizeof(unsigned int);
   }
   ///! hops
-  memcpy(serialize + off, &(_potato->hops), sizeof(unsigned int));
+  memcpy(buf + off, &(_potato->hops), sizeof(unsigned int));
   off += sizeof(unsigned int);
-
-  return serialize;
 }
 
 ///! The caller need to free the memory by self.
@@ -116,8 +121,8 @@ Potato* potato_unserialize(const char* _buf) {
           || (INDEX[POTATO_IDX][0] != _buf[2]) || (INDEX[POTATO_IDX][1] != _buf[3]) )
     return NULL;
 
-  ///! header
-  _buf += HEAD_SIZE;
+//  ///! header
+//  _buf += HEAD_SIZE;
   ///! id size
   unsigned int id_size = 0;
   memcpy(&id_size, _buf, sizeof(unsigned int));
@@ -141,7 +146,7 @@ void __packet_init_link_msg(char* buf, int id, int nums) {
 
   ///! the initialize message.
   int off = 0;
-  memset(buf, 0x00, INIT0_MSG_SIZE);
+  memset(buf, 0x00, INIT_LINK_MSG_SIZE);
   ///! header
   memcpy(buf + off, HEAD, HEAD_SIZE);
   off += HEAD_SIZE;
@@ -154,6 +159,19 @@ void __packet_init_link_msg(char* buf, int id, int nums) {
   ///! the total player number
   memcpy(buf + off, &nums, sizeof(int));
   off += sizeof(int);
+  ///! the tail
+  off += TAIL_SIZE;
+}
+
+void __packet_end_msg(char* buf) {
+  int off = 0;
+  memset(buf, 0x00, END_MSG_SIZE);
+  ///! header
+  memcpy(buf + off, HEAD, HEAD_SIZE);
+  off += HEAD_SIZE;
+  ///! index
+  memcpy(buf + off, INDEX[END_MSG_IDX], INDEX_SIZE);
+  off += INDEX_SIZE;
   ///! the tail
   off += TAIL_SIZE;
 }
