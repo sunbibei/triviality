@@ -82,6 +82,11 @@ void    potato_free(Potato* _pp) {
 void potato_print_trace(const Potato* _potato) {
   printf("Trace of potato:\n");
   int idx = 0;
+  if (0 == _potato->id_size) {
+    printf("\n");
+    return;
+  }
+
   printf("<%d>", _potato->id_list[idx++]);
   while (idx < _potato->id_size)
     printf(",<%d>", _potato->id_list[idx++]);
@@ -117,10 +122,6 @@ void potato_serialize(const Potato* _potato, char* buf) {
 
 ///! The caller need to free the memory by self.
 Potato* potato_unserialize(const char* _buf) {
-  if ( (HEAD[0] != _buf[0]) || (HEAD[1] != _buf[1])
-          || (INDEX[POTATO_IDX][0] != _buf[2]) || (INDEX[POTATO_IDX][1] != _buf[3]) )
-    return NULL;
-
 //  ///! header
 //  _buf += HEAD_SIZE;
   ///! id size

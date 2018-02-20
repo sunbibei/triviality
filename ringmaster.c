@@ -5,7 +5,7 @@
  *      Author: bibei
  */
 
-// #define MASTER
+#define MASTER
 #ifdef  MASTER
 
 #include <stdio.h>
@@ -43,11 +43,15 @@ int main(int argc, char* argv[]) {
   // struct hostent* hostinfo = gethostbyname(name);
   struct hostent* hostinfo = gethostbyname(localhost);
   if (NULL == hostinfo) {
-    if (__DEBUG__) printf("ERROR gethostbyname\n");
+#ifdef __DEBUG__
+    printf("ERROR gethostbyname\n");
+#endif
     return -1;
   }
   char *ip = inet_ntoa (*(struct in_addr *)*hostinfo->h_addr_list);
-  if (__DEBUG__) printf("ip: %s\n", ip);
+#ifdef __DEBUG__
+  printf("ip: %s\n", ip);
+#endif
 
   int* player_fds = (int*)malloc(NUM_PLAYERS*sizeof(int));
   for (int i = 0; i < NUM_PLAYERS; ++i)
@@ -60,7 +64,7 @@ int main(int argc, char* argv[]) {
   struct sockaddr_in servaddr;
   bzero(&servaddr, sizeof(servaddr));
   servaddr.sin_family = AF_INET;
-  // servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+  // servaddr.sin_addr.s_addr = htons(INADDR_ANY);
   servaddr.sin_addr.s_addr = inet_addr(ip);
   servaddr.sin_port = htons(PORT_NUM);
 
@@ -87,10 +91,20 @@ int main(int argc, char* argv[]) {
   while (num_player != NUM_PLAYERS) {
     struct sockaddr_in player_addr;
     int addr_len = 0;
+#ifdef __DEBUG__
+    printf("Waiting the player come to connect\n");
+#endif
     player_fds[num_player] = accept(ringmaster_fd, (struct sockaddr*)(&player_addr), (socklen_t*)&addr_len);
-
+#ifdef __DEBUG__
+    printf("Got a player<%d>\n", num_player);
+#endif
     __packet_init_link_msg(buf, num_player, NUM_PLAYERS);
-    send(player_fds[num_player], buf, INIT0_MSG_SIZE, 0);
+#ifdef __DEBUG__
+    for (int i = 0; i < INIT_LINK_MSG_SIZE; ++i)
+      printf("0x%02X ", buf[i]);
+    printf("\n");
+#endif
+    send(player_fds[num_player], buf, INIT_LINK_MSG_SIZE, 0);
 
     printf("Player %d is ready to play\n", num_player);
     ++num_player;
@@ -122,6 +136,12 @@ int main(int argc, char* argv[]) {
   off += TAIL_SIZE;
 
   send(player_fds[player_id], buf, off, 0);
+#ifdef __DEBUG__
+    printf("POTATO message<%d>:\n", off);
+    for (int i = 0; i < off; ++i)
+      printf("0x%02X ", buf[i]);
+    printf("\n");
+#endif
   printf("sending potato to player %d\n", player_id);
 
   //////////////////////////////////////////////////////
@@ -142,14 +162,17 @@ int main(int argc, char* argv[]) {
     select_read_set = read_set;
     int ret = select(max_fd + 1, &select_read_set, NULL, NULL, &timeout);
     if (ret <= 0) continue;
-
+#ifdef __DEBUG__
+    printf("something is coming...\n");
+#endif
     int id = 0;
     for (; id < NUM_PLAYERS; ++id) {
-      if (-1 == player_fds[id])
-        continue;
-      if (FD_ISSET(player_fds[id], &select_read_set))
-        break;
+      if (-1 == player_fds[id]) continue;
+      if (FD_ISSET(player_fds[id], &select_read_set)) break;
     }
+#ifdef __DEBUG__
+    printf("thing comes from palyer id<id-%d>\n", id);
+#endif
 
     ///! read the message.
     int next_player = -1;
@@ -158,14 +181,22 @@ int main(int argc, char* argv[]) {
     while (1) { // read the message and parse a potato object.
       int num = recv(player_fds[id], buf + total_size, MAX_BUF_SIZE - total_size, 0);
       if (num <= 0) continue;
-
+#ifdef __DEBUG__
+      printf("recv message<%d>:\n", num);
+      for (int i = total_size; i < total_size + num; ++i)
+        printf("0x%02X ", buf[i]);
+      printf("\n");
+#endif
       total_size += num;
-      if (total_size < POTATO_MSG_SIZE(1)) continue;
+      if (total_size < POTATO_MSG_SIZE(0)) continue;
       ///! find the header from the buffer and move to the head of buffer.
       num = 0;
       while (num <= total_size) {
         if ( (HEAD[0] != buf[num + 0]) || (HEAD[1] != buf[num + 1])
              || (INDEX[POTATO_IDX][0] != buf[num + 2]) || (INDEX[POTATO_IDX][1] != buf[num + 3]) ) {
+#ifdef __DEBUG__
+      printf("no found the header\n");
+#endif
           ++num;
           continue;
         }
