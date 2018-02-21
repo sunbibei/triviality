@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-#define __DEBUG__ (1)
+// #define __DEBUG__
 
 /*!
  * The protocol for communication
@@ -80,7 +80,11 @@ void    potato_free(Potato* _pp) {
 }
 
 void potato_print_trace(const Potato* _potato) {
+#ifdef __DEBUG__
+  printf("Trace of potato<%d>:\n", _potato->hops);
+#else
   printf("Trace of potato:\n");
+#endif
   int idx = 0;
   if (0 == _potato->id_size) {
     printf("\n");

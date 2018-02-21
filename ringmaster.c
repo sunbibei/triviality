@@ -5,7 +5,7 @@
  *      Author: bibei
  */
 
-#define MASTER
+// #define MASTER
 #ifdef  MASTER
 
 #include <stdio.h>
@@ -68,19 +68,19 @@ int main(int argc, char* argv[]) {
   servaddr.sin_addr.s_addr = inet_addr(ip);
   servaddr.sin_port = htons(PORT_NUM);
 
-  fd_set read_set;
-  fd_set write_set;
-  fd_set select_read_set;
-  FD_ZERO(&read_set);
-  FD_ZERO(&write_set);
-  FD_ZERO(&select_read_set);
+//  fd_set read_set;
+//  fd_set write_set;
+//  fd_set select_read_set;
+//  FD_ZERO(&read_set);
+//  FD_ZERO(&write_set);
+//  FD_ZERO(&select_read_set);
 
   int ringmaster_fd = socket(AF_INET, SOCK_STREAM, 0);
-  unsigned int value = -1;
-  setsockopt(ringmaster_fd, SOL_SOCKET, SO_REUSEADDR, (void *)&value, sizeof(value));
+  // unsigned int value = -1;
+  // setsockopt(ringmaster_fd, SOL_SOCKET, SO_REUSEADDR, (void *)&value, sizeof(value));
   bind(ringmaster_fd, (struct sockaddr *)&servaddr, sizeof(servaddr));
   listen(ringmaster_fd, NUM_PLAYERS);
-  FD_SET(ringmaster_fd, &read_set);
+  // FD_SET(ringmaster_fd, &read_set);
 
   printf("Potato Ringmaster\n");
   printf("Players = %d\n", NUM_PLAYERS);
@@ -141,45 +141,48 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i < off; ++i)
       printf("0x%02X ", buf[i]);
     printf("\n");
+    printf("==================================================\n");
+    printf("==================START GAME======================\n");
+    printf("==================================================\n");
 #endif
   printf("sending potato to player %d\n", player_id);
 
   //////////////////////////////////////////////////////
   ///! waiting to the game end or pass to the next player.
   //////////////////////////////////////////////////////
-  struct timeval timeout;
+  // struct timeval timeout;
   Potato* _pp = NULL;
+  int next_player = player_id;
   while (1) {
-    timeout.tv_sec = 5;
-    timeout.tv_usec = 0;
+//    timeout.tv_sec = 5;
+//    timeout.tv_usec = 0;
 
-    int max_fd = ringmaster_fd;
-    ///! find the maximum file descriptor.
-    for (int i = 0; i < NUM_PLAYERS; ++i)
-      if (max_fd < player_fds[i])
-        max_fd = player_fds[i];
-
-    select_read_set = read_set;
-    int ret = select(max_fd + 1, &select_read_set, NULL, NULL, &timeout);
-    if (ret <= 0) continue;
+//    int max_fd = ringmaster_fd;
+//    ///! find the maximum file descriptor.
+//    for (int i = 0; i < NUM_PLAYERS; ++i)
+//      if (max_fd < player_fds[i])
+//        max_fd = player_fds[i];
+//
+//    select_read_set = read_set;
+//    int ret = select(max_fd + 1, &select_read_set, NULL, NULL, &timeout);
+//    if (ret <= 0) continue;
+//#ifdef __DEBUG__
+//    printf("something is coming...\n");
+//#endif
+//    int id = 0;
+//    for (; id < NUM_PLAYERS; ++id) {
+//      if (-1 == player_fds[id]) continue;
+//      if (FD_ISSET(player_fds[id], &select_read_set)) break;
+//    }
 #ifdef __DEBUG__
-    printf("something is coming...\n");
-#endif
-    int id = 0;
-    for (; id < NUM_PLAYERS; ++id) {
-      if (-1 == player_fds[id]) continue;
-      if (FD_ISSET(player_fds[id], &select_read_set)) break;
-    }
-#ifdef __DEBUG__
-    printf("thing comes from palyer id<id-%d>\n", id);
+    printf("thing comes from palyer id<%d>\n", next_player);
 #endif
 
     ///! read the message.
-    int next_player = -1;
     int total_size  = 0;
     memset(buf, 0, MAX_BUF_SIZE);
     while (1) { // read the message and parse a potato object.
-      int num = recv(player_fds[id], buf + total_size, MAX_BUF_SIZE - total_size, 0);
+      int num = recv(player_fds[next_player], buf + total_size, MAX_BUF_SIZE - total_size, 0);
       if (num <= 0) continue;
 #ifdef __DEBUG__
       printf("recv message<%d>:\n", num);
@@ -238,7 +241,18 @@ int main(int argc, char* argv[]) {
       ///! tail
       memset(buf + off, 0x00, TAIL_SIZE);
       off += TAIL_SIZE;
+#ifdef __DEBUG__
+    printf("\n");
+    printf("------------------GOT POTATO----------------------\n");
+    printf("sending potato to player %d\n", next_player);
+    potato_print_trace(_pp);
 
+//    printf("message<%d>:\n", off);
+//    for (int i = 0; i < off; ++i)
+//      printf("0x%02X ", buf[i]);
+//    printf("\n");
+    printf("--------------------------------------------------\n");
+#endif
       send(player_fds[next_player], buf, off, 0);
       ///! free the potato
       potato_free(_pp);
@@ -265,7 +279,7 @@ int main(int argc, char* argv[]) {
   ///! free the memory and exit the main process
   //////////////////////////////////////////////////////
   for (int i = 0; i < NUM_PLAYERS; ++i) {
-    FD_CLR(player_fds[i], &read_set);
+    // FD_CLR(player_fds[i], &read_set);
     close(player_fds[i]);
   }
   free(player_fds);

@@ -5,7 +5,7 @@
  *      Author: bibei
  */
 
-#define PLAYER
+// #define PLAYER
 #ifdef  PLAYER
 
 #include <stdio.h>
@@ -142,6 +142,11 @@ int main(int argc, char* argv[]) {
   //////////////////////////////////////////////////////
   ///! waiting the POTATO message
   //////////////////////////////////////////////////////
+#ifdef __DEBUG__
+  printf("==================================================\n");
+  printf("==================START GAME======================\n");
+  printf("==================================================\n");
+#endif
   srand( (unsigned int) time(NULL) + PLAYER_ID );
   Potato* _pp         = NULL;
   int is_recv_end_msg = 0;
@@ -154,13 +159,15 @@ int main(int argc, char* argv[]) {
       int num = recv(player_fd, buf + total_size, MAX_BUF_SIZE - total_size, 0);
       if (num <= 0) continue;
 #ifdef __DEBUG__
-    printf("POTATO message<%d>:\n", num);
+    printf("PLAYER message<%d>:\n", num);
     for (int i = 0; i < num; ++i)
       printf("0x%02X ", buf[total_size + i]);
     printf("\n");
 #endif
       total_size += num;
-      if (total_size < POTATO_MSG_SIZE(0)) continue;
+      if (total_size < (HEAD_SIZE + INDEX_SIZE)) continue;
+
+      // if (total_size < POTATO_MSG_SIZE(0)) continue;
       ///! find the header from the buffer and move to the head of buffer.
       num = 0;
       while (num <= total_size) {
@@ -198,25 +205,31 @@ int main(int argc, char* argv[]) {
       if ((total_size - num) < POTATO_MSG_SIZE(id_size)) continue;
       ///! eat the head, index and the next player id.
       off = HEAD_SIZE + INDEX_SIZE + INTERGE_SIZE;
-#ifdef __DEBUG__
-    printf("remainder message<%d>:\n", total_size - off);
-    for (int i = off; i < total_size; ++i)
-      printf("0x%02X ", buf[i]);
-    printf("\n");
-#endif
+//#ifdef __DEBUG__
+//    printf("remainder message<%d>:\n", total_size - off);
+//    for (int i = off; i < total_size; ++i)
+//      printf("0x%02X ", buf[i]);
+//    printf("\n");
+//#endif
       ///! get the whole potato message.
       _pp = potato_unserialize(buf + off);
 #ifdef __DEBUG__
+      printf("\n");
+      printf("------------------GOT POTATO----------------------\n");
       potato_print_trace(_pp);
 #endif
       break;
     } // end while(1) -- read message
 
-    if (_pp->hops > 0) {
+    if ((NULL != _pp) && (_pp->hops > 0)) {
       Potato potato;
-      potato.hops    = _pp->hops - 1;
+      potato.hops    = _pp->hops    - 1;
+      if (0 == potato.hops) printf("I'm it\n");
       potato.id_size = _pp->id_size + 1;
       potato.id_list = (unsigned int*)malloc(potato.id_size*sizeof(unsigned int));
+      for (int i = 0; i < _pp->id_size; ++i)
+        potato.id_list[i] = _pp->id_list[i];
+      potato.id_list[_pp->id_size] = PLAYER_ID; ///! append me to the tail of list
 
       off = 0;
       ///! header
@@ -226,7 +239,7 @@ int main(int argc, char* argv[]) {
       memcpy(buf + off, INDEX[POTATO_IDX], INDEX_SIZE);
       off += INDEX_SIZE;
       ///! next id
-      int next_player = rand() % N_NGB;
+      next_player = rand() % N_NGB;
       memcpy(buf + off, NEIGHBORS + next_player, INTERGE_SIZE);
       off += INTERGE_SIZE;
       ///! potato serialize
@@ -238,16 +251,22 @@ int main(int argc, char* argv[]) {
 
       send(player_fd, buf, off, 0);
 #ifdef __DEBUG__
-    printf("re-pass potato message<%d>:\n", off);
-    for (int i = 0; i < off; ++i)
-      printf("0x%02X ", buf[i]);
-    printf("\n");
+      printf("\n");
+      printf("------------------RE-PASS POTATO------------------\n");
+      printf("ready sending the potato to player %d\n", NEIGHBORS[next_player]);
+      potato_print_trace(&potato);
+
+//      printf("message<%d>:\n", off);
+//      for (int i = 0; i < off; ++i)
+//        printf("0x%02X ", buf[i]);
+      printf("\n");
+      printf("--------------------------------------------------\n");
 #endif
       ///! free the potato
       free(potato.id_list);
       potato_free(_pp);
       _pp = NULL;
-    } else if (0 == _pp->hops) {
+    } else if ((NULL != _pp) && (0 == _pp->hops)) {
       break;
     } else {
       ; // Unreached code
