@@ -39,9 +39,9 @@ int main(int argc, char* argv[]) {
 //  }
 //  printf("hostname: %s\n", name);
 
-  char localhost[] = "localhost";
-  // struct hostent* hostinfo = gethostbyname(name);
-  struct hostent* hostinfo = gethostbyname(localhost);
+  // char localhost[] = "localhost";
+  struct hostent* hostinfo = gethostbyname(name);
+  // struct hostent* hostinfo = gethostbyname(localhost);
   if (NULL == hostinfo) {
 #ifdef __DEBUG__
     printf("ERROR gethostbyname\n");
