@@ -1,4 +1,5 @@
 import java.util.LinkedList;
+import java.util.ListIterator;
 
 public class MemoryManagementUnit {
     /** The page table */
@@ -16,10 +17,8 @@ public class MemoryManagementUnit {
     /** The free frames list */
     private LinkedList<Integer> freeFrames;
 
-    ///! The current top pointer
-    private int topPointer;
-    ///! The size of freeFrames
-    private int sizeFreeFrames;
+    /** The node for the oldest page */
+    private ListIterator<Integer> oldest;
 
     /** Create an MMU
      *
@@ -41,7 +40,8 @@ public class MemoryManagementUnit {
         
         // Initialise all the page table entries to invalid, by making default page table entries
         for (int i = 0; i < pageTableSize; ++i) {
-            pageTable[i] = new PageTableEntry();
+            pageTable[i] = new PageTableEntry((2 << bitsForOffset) * i);
+            pageTable[i].setValidBit(false);
         }
         
         freeFrames = new LinkedList<>();
@@ -51,9 +51,8 @@ public class MemoryManagementUnit {
             freeFrames.addLast((2 << bitsForOffset) * i);
         }
         
-        ///! initialize the top pointer
-        topPointer = 0;
-        sizeFreeFrames = freeFrames.size();
+        // it initialize the interator
+        oldest = freeFrames.listIterator(0);
     }
     
     /** Access a memory address; returning true if there was a page fault */
@@ -61,8 +60,6 @@ public class MemoryManagementUnit {
         int offset = address & offsetMask;
         int pageNumber = (address & pageNumberMask) >> bitsForOffset;
         
-        // System.out.println("");
-        // System.out.println("");
         // System.out.println("Accessing memory with page " + pageNumber + ", offset " + offset);
         
         if (pageTable[pageNumber].getValidBit()) {
@@ -86,31 +83,26 @@ public class MemoryManagementUnit {
         // TODO: your code goes here
         // Implement the second-chance page-fault handler algorithm
         // (Don't forget to check if there is a free frame)
-        // System.out.println("==================================================");
         while (true) {
-            int address = freeFrames.get(topPointer);
-            int victim  = (address & pageNumberMask) >> bitsForOffset;
-            victim >>= 1;
-            // System.out.println("Before Location: " + topPointer + ", Address: " + freeFrames.get(topPointer) + " => " + victim);
+            // update the oldest.
+            if (!oldest.hasNext())
+                oldest  = freeFrames.listIterator(0);
 
-            if (pageTable[victim].getValidBit() && pageTable[victim].getReferenceBit()) {
-                pageTable[victim].setReferenceBit(false);
-                topPointer = (topPointer + 1) % sizeFreeFrames;
-                continue;
+            int addr  = oldest.next();
+            int pageN = ((addr & pageNumberMask) >> bitsForOffset) / 2;
+            if (!pageTable[pageN].getValidBit() || !pageTable[pageN].getReferenceBit()) {
+                // clear the all of flag
+                pageTable[pageN].setValidBit(false);
+                pageTable[pageN].setReferenceBit(false);
+                // set the flag
+                oldest.set(pageTable[pageNumber].getAddress());
+                pageTable[pageNumber].setValidBit(true);
+                pageTable[pageNumber].setReferenceBit(false);
+
+                return;
             }
 
-            freeFrames.set(topPointer, ((2 << bitsForOffset) * pageNumber));
-            // System.out.println("After  Location: " + topPointer + ", Address: " + freeFrames.get(topPointer) + " => " + pageNumber); 
-
-            pageTable[victim].setValidBit(false);
-            pageTable[victim].setReferenceBit(false);
-
-            pageTable[pageNumber].setValidBit(true);
-            pageTable[pageNumber].setReferenceBit(false);
-            topPointer = (topPointer + 1) % sizeFreeFrames;
-
-            // System.out.println("--------------------------------------------------");
-            return;
+            pageTable[pageN].setReferenceBit(false);
         }
     }
 }
