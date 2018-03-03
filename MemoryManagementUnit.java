@@ -15,7 +15,12 @@ public class MemoryManagementUnit {
     
     /** The free frames list */
     private LinkedList<Integer> freeFrames;
-    
+
+    ///! The current top pointer
+    private int topPointer;
+    ///! The size of freeFrames
+    private int sizeFreeFrames;
+
     /** Create an MMU
      *
      * @param pageTableSize  The number of entries in the page table
@@ -46,6 +51,9 @@ public class MemoryManagementUnit {
             freeFrames.addLast((2 << bitsForOffset) * i);
         }
         
+        ///! initialize the top pointer
+        topPointer = 0;
+        sizeFreeFrames = freeFrames.size();
     }
     
     /** Access a memory address; returning true if there was a page fault */
@@ -53,7 +61,9 @@ public class MemoryManagementUnit {
         int offset = address & offsetMask;
         int pageNumber = (address & pageNumberMask) >> bitsForOffset;
         
-        //System.out.println("Accessing memory with page " + pageNumber + ", offset " + offset);
+        // System.out.println("");
+        // System.out.println("");
+        // System.out.println("Accessing memory with page " + pageNumber + ", offset " + offset);
         
         if (pageTable[pageNumber].getValidBit()) {
             // no page fault, woot
@@ -76,7 +86,31 @@ public class MemoryManagementUnit {
         // TODO: your code goes here
         // Implement the second-chance page-fault handler algorithm
         // (Don't forget to check if there is a free frame)
+        // System.out.println("==================================================");
+        while (true) {
+            int address = freeFrames.get(topPointer);
+            int victim  = (address & pageNumberMask) >> bitsForOffset;
+            victim >>= 1;
+            // System.out.println("Before Location: " + topPointer + ", Address: " + freeFrames.get(topPointer) + " => " + victim);
 
-        
+            if (pageTable[victim].getValidBit() && pageTable[victim].getReferenceBit()) {
+                pageTable[victim].setReferenceBit(false);
+                topPointer = (topPointer + 1) % sizeFreeFrames;
+                continue;
+            }
+
+            freeFrames.set(topPointer, ((2 << bitsForOffset) * pageNumber));
+            // System.out.println("After  Location: " + topPointer + ", Address: " + freeFrames.get(topPointer) + " => " + pageNumber); 
+
+            pageTable[victim].setValidBit(false);
+            pageTable[victim].setReferenceBit(false);
+
+            pageTable[pageNumber].setValidBit(true);
+            pageTable[pageNumber].setReferenceBit(false);
+            topPointer = (topPointer + 1) % sizeFreeFrames;
+
+            // System.out.println("--------------------------------------------------");
+            return;
+        }
     }
 }
