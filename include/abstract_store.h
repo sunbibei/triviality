@@ -15,6 +15,8 @@ namespace edu {
 namespace neu {
 namespace csye6205 {
 
+class AbstractStore* factory();
+
 class AbstractStore {
 public:
   AbstractStore()          { };
@@ -22,11 +24,8 @@ public:
 
 public:
   virtual void addItem(Item*)  = 0;
-  virtual void sortInventory() = 0;
+  virtual void sortInventory(const std::string&) = 0;
   virtual void showInventory() = 0;
-
-protected:
-  std::vector<Item*> inventory_;
 };
 
 } /** end namespace csye6205 */

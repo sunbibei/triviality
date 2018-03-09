@@ -6,6 +6,7 @@
  */
 
 #include <item.h>
+#include <typeinfo>
 
 namespace edu {
 namespace neu {
@@ -20,9 +21,17 @@ Item::~Item() {
   ;
 }
 
+std::string& Item::name()   { return name_;   }
+double&      Item::price()  { return price_;  }
+size_t&      Item::number() { return number_; }
+
+const std::string& Item::name()   const { return name_;   }
+const double&      Item::price()  const { return price_;  }
+const size_t&      Item::number() const { return number_; }
+
 std::ostream& operator<<(std::ostream& _os, const Item& _item) {
   char buf[128] = {0};
-  sprintf(buf, "[%s](%s) -> %08.04f / %04ld", typeid(_item).name(), _item.name_.c_str(), _item.price_, _item.number_);
+  sprintf(buf, "[%s](%24s)\t %08.04f / %04ld", typeid(_item).name(), _item.name_.c_str(), _item.price_, _item.number_);
   _os << buf;
   return _os;
 }

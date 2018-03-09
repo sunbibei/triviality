@@ -23,6 +23,15 @@ public:
   Item(const std::string&, double, size_t);
   virtual ~Item();
 
+///! The getter and setter.
+public:
+  std::string&       name();
+  const std::string& name() const;
+  double&       price();
+  const double& price() const;
+  size_t&       number();
+  const size_t& number() const;
+
 public:
   friend std::ostream& operator<<(std::ostream&, const Item&);
 

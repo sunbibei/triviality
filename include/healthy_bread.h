@@ -20,6 +20,10 @@ public:
   virtual ~HealthyBread();
 
 public:
+  double& calories();
+  const double& calories() const;
+
+public:
   friend std::ostream& operator<<(std::ostream&, const HealthyBread&);
 
 protected:
