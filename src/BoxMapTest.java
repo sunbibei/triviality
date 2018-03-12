@@ -11,10 +11,10 @@ public class BoxMapTest {
 		*/
 		map.setBlock(new Point2D(2,2), new Point2D(4,4));
 		
-		map.forEachNeighbour(new Point2D(100, 100), (_p) -> {
-			System.out.println("foreach: [" + _p.getX() + ", " + _p.getY() + "]");
-		});
+//		map.forEachNeighbour(new Point2D(100, 100), (_p) -> {
+//			System.out.println("foreach: [" + _p.getX() + ", " + _p.getY() + "]");
+//		});
 		
-		// System.out.println(map);
+		System.out.println(map);
 	}
 }

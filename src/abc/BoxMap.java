@@ -1,7 +1,7 @@
 package abc;
 
+import java.util.Stack;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 /*!
  * @brief The class for BoxMap, the origin is placed at the left top. example as:
@@ -26,13 +26,22 @@ public class BoxMap {
 		map_ = new Cell[WIDTH][HEIGHT];
 		for (int w = 0; w < WIDTH; ++w) {
 			for (int h = 0; h < HEIGHT; ++h) {
-				map_[w][h] = new Cell(new Point2D(w, h));
+				map_[w][h] = new Cell(w, h);
 			}
 		}
 	}
 	
-	public void forEachNeighbour(Point2D _p, Consumer<Point2D> action) {
-		action.accept(_p);
+	public void forEachNeighbour(final Cell _p, Consumer<Cell> action) {
+		action.accept(new Cell(_p));
+	}
+	
+	public Cell getCell(Point2D p) { 
+		if ((p.getX() < 0) || (p.getX() >= WIDTH) ||
+				(p.getY() < 0) || (p.getY() >= HEIGHT)) {
+			// System.out.println("ERROR LOCATION" + p.toString() + " FOR CELL");
+			return null;
+		}
+		return map_[p.getX()][p.getY()];
 	}
 	
 	public void setBlock(int x, int y/*, boolean _b*/) { map_[x][y].setBlock(true); }
@@ -55,6 +64,21 @@ public class BoxMap {
 		}
 	}
 	
+	public String printPath(Stack<Point2D> path) {
+		String ret = "";
+		for (int w = 0; w < WIDTH; ++w) {
+			for (int h = 0; h < HEIGHT; ++h) {
+				if (map_[w][h].isBlock())
+					ret += "*";
+				else if (-1 != path.indexOf(new Point2D(w, h)))
+					ret += "-";
+				else
+					ret += "o";
+			}
+			ret += "\n";
+		}
+		return ret;
+	}
 	
 	@Override
 	public String toString() {

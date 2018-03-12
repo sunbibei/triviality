@@ -9,6 +9,11 @@ public class Point2D {
 		y_ = _y;
 	}
 	
+	public Point2D(Point2D _o) {
+		x_ = _o.x_;
+		y_ = _o.y_;
+	}
+	
 	public int  getX() { return x_; }
 	public int  getY() { return y_; }
 	
@@ -22,6 +27,14 @@ public class Point2D {
 		setLocation(_o.x_, _o.y_);
 	}
 	
+	public Point2D plus(Point2D _o) {
+		return new Point2D(x_ + _o.x_, y_ + _o.y_);
+	}
+	
+	public Point2D minus(Point2D _o) {
+		return new Point2D(x_ - _o.x_, y_ - _o.y_);
+	}
+	
 	public Point2D add(Point2D _o) {
 		x_ += _o.x_;
 		y_ += _o.y_;
@@ -32,6 +45,11 @@ public class Point2D {
 		x_ -= _o.x_;
 		y_ -= _o.y_;
 		return this;
+	}
+	
+	@Override
+	public boolean equals(Object _o) {
+		return equals( (Point2D)_o );
 	}
 	
 	public boolean equals(Point2D _o) {
