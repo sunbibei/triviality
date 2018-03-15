@@ -17,10 +17,11 @@ public:
   virtual ~Player();
 
 public:
-  TokenType index() const { return idx_; }
+  TokenType type() const { return idx_; }
 
   ///! the token handle
   const Token* token(int _no) const;
+  Token* token(int _no);
 
   ///! move the token which with the given index @_no to the cell @_cell.
   bool move(int _no, class Cell* _cell);

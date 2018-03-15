@@ -38,9 +38,12 @@ public:
 
   void availableDiag(std::vector<const Cell*>&);
   /*!
-   * @brief Move the token @_token to the cell @_cell
+   * @brief Move the token @_token to the cell @_cell, the index of token @captured
+   *        is captured, the @captured is -1, if these are not token is captured.
    */
-  void movePiece(Token* _token, Cell* _cell);
+  bool movePiece(Token* _token, DiagCell _dc, int& captured);
+
+  // bool canMove(Token* _token, std::vector<DiagCell>& _dc);
 
   ///! printf the board
   void print();

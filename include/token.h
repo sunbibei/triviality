@@ -12,22 +12,25 @@
 
 class Token {
 public:
-  Token(TokenType, int);
+  Token(TokenType, int, class Player*);
   virtual ~Token();
 
 public:
   int       index()  const { return idx_; }
   bool      isKing() const { return is_king_; }
   TokenType type()   const { return type_; }
+  bool      canMove(DiagCell) const;
 
   void move(class Cell* _cell);
 
-  class Cell* getLocation() { return location_; }
+  class Cell*   getCell() { return location_; }
+  class Player* getPlayer();
 
 private:
   const TokenType    type_;
   const int          idx_;
   class Cell*        location_;
+  class Player*      player_;
 
   bool               is_king_;
 };

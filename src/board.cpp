@@ -67,12 +67,15 @@ Board::~Board() {
 }
 
 void Board::initToken(Player* _p0, Player* _p1) {
+  Player* red   = (TokenType::TK_RED   == _p0->type()) ? _p0 : _p1;
+  Player* white = (TokenType::TK_WHITE == _p0->type()) ? _p0 : _p1;
+
   int token_idx = 0;
   for (int i = 0; i < N_INIT_TOKEN_ROWS; ++i) {
     auto& rows = black_cells_[i];
     for (auto& cell : rows) {
-      _p0->move(token_idx, cell);
-      cell->token = _p0->token(token_idx);
+      red->move(token_idx, cell);
+      cell->token = red->token(token_idx);
       ++token_idx;
     }
   }
@@ -81,19 +84,58 @@ void Board::initToken(Player* _p0, Player* _p1) {
   for (int i = SIZE - 1; i >= (SIZE - N_INIT_TOKEN_ROWS); --i) {
     auto& rows = black_cells_[i];
     for (auto& cell : rows) {
-      _p1->move(token_idx, cell);
-      cell->token = _p1->token(token_idx);
+      white->move(token_idx, cell);
+      cell->token = white->token(token_idx);
       ++token_idx;
     }
   }
 }
 
-void Board::movePiece(Token* _token, Cell* _cell) {
-  auto prev_cell   = _token->getLocation();
-  if (nullptr != prev_cell->token)
-    prev_cell->token = nullptr;
+bool Board::movePiece(Token* _token, DiagCell _dc, int& captured) {
+  captured = -1; // The default value.
 
-  _token->move(_cell);
+  auto prev_cell = _token->getCell();
+  if (nullptr == prev_cell) return false;
+
+  auto next_cell = _token->getCell()->diags[_dc];
+  if (nullptr == next_cell) return false;
+
+  if (!_token->canMove(_dc)) {
+    std::cout << "The piece[" << TK2STR(_token->type()) << "-"<< _token->index()
+        << "] can't move to the place: " << _dc << std::endl;
+    return false;
+  }
+
+  if (nullptr == next_cell->token) {
+    _token->move(next_cell);
+    // update this cell.
+    next_cell->token = _token;
+    prev_cell->token = nullptr;
+    return true;
+  }
+  ///! This place is occupied by the player's token.
+  if (_token->type() == next_cell->token->type()) {
+    std::cout << "The piece[" << TK2STR(_token->type()) << "-"<< _token->index()
+        << "] can't move to the place: " << _dc
+        << ", cause this place is occupied."<< std::endl;
+    return false;
+  }
+
+  ///! The player want to jump to the next-next cell.
+  auto nnext_cell = next_cell->diags[_dc];
+  if ( (nullptr == nnext_cell) || (nullptr != nnext_cell->token) )
+    return false;
+
+  ///! ready to captured an opponent’s piece
+  ///! move
+  _token->move(nnext_cell);
+  ///! then kill an opponent's piece
+  captured = next_cell->token->index();
+  // update this cell.
+  nnext_cell->token = _token;
+  prev_cell->token  = nullptr;
+
+  return true;
 }
 
 void Board::print() {

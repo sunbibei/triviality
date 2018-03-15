@@ -13,12 +13,16 @@ enum TokenType {
   TK_WHITE,
   N_TK_TYPE
 };
+#define TK2STR(t) \
+    ( ( (const char*[]){"RED", "WHITE", "N_TK_TYPE"} )[t] )
 
 enum CellType {
   CL_BLACK = 0,
   CL_WHITE,
   N_CL_TYPE
 };
+#define CT2STR(t) \
+    ( ( (const char*[]){"BLACK", "WHITE", "N_CL_TYPE"} )[t] )
 
 ///! Anti-Clock
 ///! 0 X 1
@@ -35,7 +39,8 @@ enum DiagCell {
   DC_3,
   N_DC,
 };
-
+#define DC2STR(t) \
+    ( ( (const char*[]){"HL", "HR", "FR", "FL", "N_DC"} )[t] )
 
 
 #endif /* INCLUDE_UTF_H_ */

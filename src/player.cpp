@@ -14,7 +14,7 @@ Player::Player(TokenType _no, int n_token)
   : N_TOKEN(n_token), idx_(_no) {
   tokens_.resize(n_token);
   for (int n = 0; n < n_token; ++n)
-    tokens_[n]   = new Token(_no, n);
+    tokens_[n]   = new Token(_no, n, this);
 }
 
 Player::~Player() {
@@ -40,12 +40,18 @@ bool Player::captured(int _no) {
 }
 
 Cell* Player::where(int _no) {
-  if (!__checkToken(_no)) return false;
+  if (!__checkToken(_no)) return nullptr;
 
-  return tokens_[_no]->getLocation();
+  return tokens_[_no]->getCell();
 }
 
 const Token* Player::token(int _no) const {
+  if (!__checkToken(_no)) return nullptr;
+
+  return tokens_[_no];
+}
+
+Token* Player::token(int _no) {
   if (!__checkToken(_no)) return nullptr;
 
   return tokens_[_no];

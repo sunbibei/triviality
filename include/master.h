@@ -9,6 +9,7 @@
 #define INCLUDE_MASTER_H_
 
 #include "utf.h"
+#include <vector>
 
 class Master {
 ///! singleton
@@ -20,6 +21,11 @@ public:
 public:
   void initialize();
   void run();
+
+///! The helpers
+private:
+  bool is_end();
+  bool makeMove(TokenType, int, const std::vector<DiagCell>&);
 
 protected:
   Master(int);
