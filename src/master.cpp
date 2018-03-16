@@ -39,7 +39,7 @@ void Master::initialize() {
   board_ = new Board(board_size_);
 
   ///! create the players
-  int token_size = board_size_/2*N_INIT_TOKEN_ROWS;
+  int token_size = board_size_*(board_size_ - 2)/4;
   players_[TokenType::TK_RED]   = new Player(TokenType::TK_RED,   token_size);
   players_[TokenType::TK_WHITE] = new Player(TokenType::TK_WHITE, token_size);
 

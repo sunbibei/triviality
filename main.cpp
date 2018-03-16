@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  // int size = 8;
+  // int size = 12;
   if (nullptr == Master::create_instance(size)) {
     std::cout << "Something is wrong!" << std::endl;
     return -1;

@@ -72,23 +72,25 @@ void Board::initToken(Player* _p0, Player* _p1) {
   Player* white = (TokenType::TK_WHITE == _p0->type()) ? _p0 : _p1;
 
   int token_idx = 0;
-  for (int i = 0; i < N_INIT_TOKEN_ROWS; ++i) {
+  for (size_t i = 0; i < black_cells_.size(); ++i) {
     auto& rows = black_cells_[i];
     for (auto& cell : rows) {
       red->move(token_idx, cell);
       cell->token_ = red->token(token_idx);
       ++token_idx;
     }
+    if (token_idx == red->N_token()) break;
   }
 
   token_idx = 0;
-  for (int i = SIZE - 1; i >= (SIZE - N_INIT_TOKEN_ROWS); --i) {
+  for (int i = SIZE - 1; i >= 0; --i) {
     auto& rows = black_cells_[i];
     for (auto& cell : rows) {
       white->move(token_idx, cell);
       cell->token_ = white->token(token_idx);
       ++token_idx;
     }
+    if (token_idx == white->N_token()) break;
   }
 }
 

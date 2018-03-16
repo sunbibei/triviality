@@ -13,8 +13,6 @@
 #include "cell.h"
 #include "token.h"
 
-#define N_INIT_TOKEN_ROWS (3)
-
 /*!
  * The board class, the coordinate system as follow:
  * o -> +y
