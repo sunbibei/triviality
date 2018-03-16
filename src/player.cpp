@@ -34,6 +34,7 @@ bool Player::move(int _no, Cell* _cell) {
 bool Player::captured(int _no) {
   if (!__checkToken(_no)) return false;
 
+  tokens_[_no]->move(nullptr);
   delete tokens_[_no];
   tokens_[_no] = nullptr;
   return true;
@@ -43,6 +44,20 @@ Cell* Player::where(int _no) {
   if (!__checkToken(_no)) return nullptr;
 
   return tokens_[_no]->getCell();
+}
+
+///! the remain tokens.
+const int Player::n_token() const {
+  int n = 0;
+  for (const auto& t : tokens_)
+    if (nullptr != t) ++n;
+
+  return n;
+}
+
+///! the total tokens.
+const int Player::N_token() const {
+  return N_TOKEN;
 }
 
 const Token* Player::token(int _no) const {
@@ -60,11 +75,11 @@ Token* Player::token(int _no) {
 
 inline bool Player::__checkToken(int _no) const {
   if ((_no < 0) || (_no >= N_TOKEN)) {
-    std::cout << "error token number!" << std::endl;
+    // std::cout << "error token number!" << std::endl;
     return false;
   }
   if (nullptr == tokens_[_no]) {
-    std::cout << "The token has captured!" << std::endl;
+    // std::cout << "The token has captured!" << std::endl;
     return false;
   }
 

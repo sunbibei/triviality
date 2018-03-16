@@ -15,22 +15,30 @@
 class Cell {
   friend class Board;
 public:
-  Cell(int _x, int _y, CellType _t, bool _king_row)
-  : x(_x), y(_y), type(_t), is_king_row(_king_row),
-    token(nullptr) {
-    for (auto& dc : diags)
+  Cell(int _x, int _y, CellType _t,
+      TokenType t = TokenType::N_TK_TYPE)
+  : x(_x), y(_y), type(_t), token_(nullptr) {
+    for (auto& dc : diags_)
       dc = nullptr;
+    for (auto& r : is_king_row_)
+      r = false;
+    if (TokenType::N_TK_TYPE != t)
+      is_king_row_[t] = true;
   }
+
+  const bool   king_row(TokenType t) const { return is_king_row_[t]; }
+  const Cell*  diag(DiagCell dc)     const { return diags_[dc]; }
+  const Token* token()               const { return token_; }
 
 private:
   const int      x;
   const int      y;
   const CellType type;
-  const bool     is_king_row;
+  bool     is_king_row_[TokenType::N_TK_TYPE];
 
-  Cell*          diags[N_DC];
+  Cell*          diags_[N_DC];
 
-  const Token*   token;
+  const Token*   token_;
 };
 
 #endif /* INCLUDE_CELL_H_ */

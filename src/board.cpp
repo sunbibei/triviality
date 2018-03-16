@@ -21,38 +21,39 @@ Board::Board(int _SIZE)
   for (auto& rows : black_cells_)
     rows.reserve(SIZE/2);
 
-  for (int r = 0; r < SIZE; ++r) {
-    auto& rows = cells_[r];
-    bool king = ( (0 == r) || ((SIZE - 1) == r) );
-    for (int c = 0; c < SIZE; ++c) {
-      CellType type = ( ((0 == r%2) && (0 == c%2)) || ((1 == r%2) && (1 == c%2)) )
+  for (int x = 0; x < SIZE; ++x) {
+    auto& rows = cells_[x];
+    TokenType t = TokenType::N_TK_TYPE;
+    if (0 == x) t = TokenType::TK_WHITE;
+    if ((SIZE - 1) == x) t = TokenType::TK_RED;
+
+    for (int y = 0; y < SIZE; ++y) {
+      CellType type = ( ((0 == x%2) && (0 == y%2)) || ((1 == x%2) && (1 == y%2)) )
           ? CellType::CL_BLACK : CellType::CL_WHITE;
 
-      Cell* cell = new Cell(r, c, type, king);
-      rows[c] = cell;
+      rows[y] = new Cell(x, y, type, t);
     }
   }
 
   for (int x = 0; x < SIZE; ++x) {
-    auto& rows   = cells_[x];
     auto& b_rows = black_cells_[x];
     for (int y = 0; y < SIZE; ++y) {
-      if (CellType::CL_BLACK != rows[y]->type) continue;
+      if (CellType::CL_BLACK != cells_[x][y]->type) continue;
 
       // find the lh
-      if ( ((y - 1) >= 0) && ((x - 1) >= 0) )
-        rows[y]->diags[DiagCell::DC_0] = cells_[x-1][y-1];
-      // find the lf
-      if ( ((y + 1) < SIZE) && ((x - 1) >= 0) )
-        rows[y]->diags[DiagCell::DC_1] = cells_[x-1][y+1];
+      if ( ((x - 1) >= 0) && ((y - 1) >= 0) )
+        cells_[x][y]->diags_[DiagCell::DC_0] = cells_[x-1][y-1];
       // find the rh
-      if ( ((y + 1) < SIZE) && ((x + 1) < SIZE) )
-        rows[y]->diags[DiagCell::DC_2] = cells_[x+1][y+1];
+      if ( ((x - 1) >= 0) && ((y + 1) < SIZE) )
+        cells_[x][y]->diags_[DiagCell::DC_1] = cells_[x-1][y+1];
       // find the rf
-      if ( ((y + 1) < SIZE) && ((x - 1) >= 0) )
-        rows[y]->diags[DiagCell::DC_3] = cells_[x-1][y+1];
+      if ( ((x + 1) < SIZE) && ((y + 1) < SIZE) )
+        cells_[x][y]->diags_[DiagCell::DC_2] = cells_[x+1][y+1];
+      // find the lf
+      if ( ((x + 1) < SIZE) && ((y - 1) >= 0) )
+        cells_[x][y]->diags_[DiagCell::DC_3] = cells_[x+1][y-1];
 
-      b_rows.push_back(rows[y]);
+      b_rows.push_back(cells_[x][y]);
     }
   }
 }
@@ -75,7 +76,7 @@ void Board::initToken(Player* _p0, Player* _p1) {
     auto& rows = black_cells_[i];
     for (auto& cell : rows) {
       red->move(token_idx, cell);
-      cell->token = red->token(token_idx);
+      cell->token_ = red->token(token_idx);
       ++token_idx;
     }
   }
@@ -85,7 +86,7 @@ void Board::initToken(Player* _p0, Player* _p1) {
     auto& rows = black_cells_[i];
     for (auto& cell : rows) {
       white->move(token_idx, cell);
-      cell->token = white->token(token_idx);
+      cell->token_ = white->token(token_idx);
       ++token_idx;
     }
   }
@@ -94,47 +95,34 @@ void Board::initToken(Player* _p0, Player* _p1) {
 bool Board::movePiece(Token* _token, DiagCell _dc, int& captured) {
   captured = -1; // The default value.
 
-  auto prev_cell = _token->getCell();
-  if (nullptr == prev_cell) return false;
-
-  auto next_cell = _token->getCell()->diags[_dc];
-  if (nullptr == next_cell) return false;
-
   if (!_token->canMove(_dc)) {
     std::cout << "The piece[" << TK2STR(_token->type()) << "-"<< _token->index()
-        << "] can't move to the place: " << _dc << std::endl;
+        << "] can't move to the place: " << DC2STR(_dc) << std::endl;
     return false;
   }
 
-  if (nullptr == next_cell->token) {
+  auto prev_cell = _token->getCell();
+  auto next_cell = _token->getCell()->diags_[_dc];
+
+  if (nullptr == next_cell->token()) {
     _token->move(next_cell);
     // update this cell.
-    next_cell->token = _token;
-    prev_cell->token = nullptr;
+    next_cell->token_ = _token;
+    prev_cell->token_ = nullptr;
     return true;
-  }
-  ///! This place is occupied by the player's token.
-  if (_token->type() == next_cell->token->type()) {
-    std::cout << "The piece[" << TK2STR(_token->type()) << "-"<< _token->index()
-        << "] can't move to the place: " << _dc
-        << ", cause this place is occupied."<< std::endl;
-    return false;
   }
 
   ///! The player want to jump to the next-next cell.
-  auto nnext_cell = next_cell->diags[_dc];
-  if ( (nullptr == nnext_cell) || (nullptr != nnext_cell->token) )
-    return false;
-
+  auto nnext_cell = next_cell->diags_[_dc];
   ///! ready to captured an opponent’s piece
   ///! move
   _token->move(nnext_cell);
   ///! then kill an opponent's piece
-  captured = next_cell->token->index();
+  captured = next_cell->token_->index();
   // update this cell.
-  nnext_cell->token = _token;
-  prev_cell->token  = nullptr;
-
+  nnext_cell->token_ = _token;
+  next_cell->token_  = nullptr;
+  prev_cell->token_  = nullptr;
   return true;
 }
 
@@ -144,17 +132,17 @@ void Board::print() {
     for (const auto& cell : rows) {
       if (CellType::CL_BLACK == cell->type) {
         // print the cell
-        if (nullptr != cell->token) {
-          if (TokenType::TK_RED == cell->token->type()) {
-            if (cell->token->isKing())
-              printf("\033[1;31;47m%2d\033[0m", cell->token->index());
+        if (nullptr != cell->token_) {
+          if (TokenType::TK_RED == cell->token_->type()) {
+            if (cell->token_->isKing())
+              printf("\033[1;31;47m%2d\033[0m", cell->token_->index());
             else
-              printf("\033[31;47m%2d\033[0m", cell->token->index());
+              printf("\033[31;47m%2d\033[0m", cell->token_->index());
           } else {
-            if (cell->token->isKing())
-              printf("\033[1;30;47m%2d\033[0m", cell->token->index());
+            if (cell->token_->isKing())
+              printf("\033[1;30;47m%2d\033[0m", cell->token_->index());
             else
-              printf("\033[1;30;47m%2d\033[0m", cell->token->index());
+              printf("\033[30;47m%2d\033[0m", cell->token_->index());
           }
         } else {
           printf("\033[30;47m  \033[0m");

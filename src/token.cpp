@@ -20,16 +20,34 @@ Token::~Token() {
 }
 
 bool Token::canMove(DiagCell dc) const {
-  if (is_king_) return true;
-
-  if (TokenType::TK_RED == type_) {
-    return ( (DiagCell::DC_2 == dc) || (DiagCell::DC_3 == dc) );
-  } else {
-    return ( (DiagCell::DC_0 == dc) || (DiagCell::DC_1 == dc) );
+  if (!is_king_ && (TokenType::TK_RED == type_)
+      && ((DiagCell::DC_2 != dc) && (DiagCell::DC_3 != dc)) ) {
+    return false;
   }
+  if (!is_king_ && (TokenType::TK_WHITE == type_)
+      && ((DiagCell::DC_0 != dc) && (DiagCell::DC_1 != dc)) ) {
+    return false;
+  }
+  ///! No such diagonally cell.
+  auto next_cell = location_->diag(dc);
+  if (nullptr == next_cell)          return false;
+  if (nullptr == next_cell->token()) return true;
+
+  ///! The cell has a piece and the same type.
+  if (type_ == next_cell->token()->type()) return false;
+  ///! it should be captured.
+  auto nnext_cell = next_cell->diag(dc);
+  ///! No such d-diagonally cell or has a piece.
+  if ( (nullptr == nnext_cell) || (nullptr != nnext_cell->token()) )
+    return false;
+
+  return true;
 }
 
 void Token::move(Cell* _cell) {
+  if ((nullptr != _cell) && !is_king_)
+    is_king_  = _cell->king_row(type_);
+
   location_ = _cell;
 }
 

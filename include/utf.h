@@ -14,7 +14,10 @@ enum TokenType {
   N_TK_TYPE
 };
 #define TK2STR(t) \
-    ( ( (const char*[]){"RED", "WHITE", "N_TK_TYPE"} )[t] )
+    ( ( (const char*[]){"R E D", "WHITE", "N_TK_TYPE"} )[(t)] )
+
+#define TKOPPONENT(t) \
+    ( ( (const TokenType[]){TK_WHITE, TK_RED, N_TK_TYPE} )[(t)] )
 
 enum CellType {
   CL_BLACK = 0,

@@ -24,7 +24,7 @@ public:
 
 ///! The helpers
 private:
-  bool is_end();
+  bool is_end(TokenType* win = nullptr);
   bool makeMove(TokenType, int, const std::vector<DiagCell>&);
 
 protected:

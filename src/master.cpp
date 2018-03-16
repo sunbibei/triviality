@@ -27,6 +27,8 @@
 void __get_move_input(std::vector<DiagCell>&);
 int __get_piece_input(Player* _p);
 
+void __print_capture(Player* _p0, Player* _p1);
+
 Master* Master::inst_ = nullptr;
 
 void Master::initialize() {
@@ -46,17 +48,24 @@ void Master::initialize() {
 
   ///! everything is OK
   // std::cout << "The checker has initialized!" << std::endl;
-  std::cout << "ROUND 0:" << std::endl;
-  board_->print();
+//  std::cout << "ROUND 0:" << std::endl;
+//  board_->print();
 }
 
 void Master::run() {
   int round = 1;
-  Player* _p = players_[TokenType::TK_RED];
-  while (8 != round/*is_end()*/) {
-    std::cout << "Turn is the " << ((TokenType::TK_RED == _p->type()) ?
-            "red" : "white") << " player!" << std::endl;
+  TokenType win = TokenType::N_TK_TYPE;
+  Player* _p    = players_[TokenType::TK_RED];
+  while (!is_end(&win)) {
+    printf("+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-\n");
+    printf("ROUND [%03d]\n", round);
+    printf("Turn to [%5s]\n", TK2STR(_p->type()));
+    __print_capture(players_[TokenType::TK_RED], players_[TokenType::TK_WHITE]);
+    // print the board
+    board_->print();
 
+    if (TokenType::TK_RED == _p->type())
+      printf("\033[31m");
     bool is_move = false;
     do {
       int tk_idx = __get_piece_input(_p);
@@ -67,18 +76,35 @@ void Master::run() {
       is_move = !moves.empty();
     } while (!is_move);
 
-    // print the board
-    std::cout << "ROUND " << round << ":" << std::endl;
-    board_->print();
+    printf("\033[0m");
+    printf("+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-\n");
+
     // Advance the variables
     ++round;
     _p = players_[(0 == round % 2) ? TokenType::TK_WHITE : TokenType::TK_RED];
   }
+
+  // print the board
+  board_->print();
+  printf("\033[1;36m  %s WIN!\033[0m\n", TK2STR(win));
 }
 
-bool Master::is_end() {
-  // TODO
-  return false;
+bool Master::is_end(TokenType* win) {
+  for (const auto& _p : players_) {
+    ///! the default value.
+    if (nullptr != win) *win = TKOPPONENT(_p->type());
+    if (0 == _p->n_token()) return true;
+
+    for (int i = _p->N_token() - 1; i >= 0; --i) {
+      auto token = _p->token(i);
+      if (nullptr == token) continue;
+      for (const auto& dc : {DiagCell::DC_0, DiagCell::DC_1, DiagCell::DC_2, DiagCell::DC_3}) {
+        if (token->canMove(dc)) return false;
+      }
+    }
+  }
+
+  return true;
 }
 
 bool Master::makeMove(TokenType _type, int tk_idx, const std::vector<DiagCell>& steps) {
@@ -88,6 +114,7 @@ bool Master::makeMove(TokenType _type, int tk_idx, const std::vector<DiagCell>& 
     int captured = -1;
     if (!board_->movePiece(token, _s, captured)) return false;
     if (-1 != captured) {
+
       players_[(TokenType::TK_RED == _type)?TokenType::TK_WHITE : TokenType::TK_RED]
           ->captured(captured);
     }
@@ -135,24 +162,29 @@ Master::~Master() {
 }
 
 int __get_piece_input(Player* _p) {
-  std::cout << "Choice the piece you want to move." << std::endl;
+  std::cout << "Which piece? ";
 
   int idx = -1;
   std::string input;
   while (true) {
     INPUT_UNTIL_CR(input);
     idx = atoi(input.c_str());
-    if (nullptr != _p->where(idx))
-      break;
+    if ( (0 != idx) || ('0' == input.back()) ) {
+      if (nullptr != _p->where(idx))
+        break;
+    }
 
-    std::cout << "ERROR INPUT! INPUT AGAIN!" << std::endl;
+    std::cout << "ERROR INPUT[ ";
+    for (int i = 0; i < _p->N_token(); ++i)
+      if (nullptr != _p->token(i)) std::cout << i << " ";
+    std::cout << "]! INPUT AGAIN! ";
   }
 
   return idx;
 }
 
 void __get_move_input(std::vector<DiagCell>& moves) {
-  std::cout << "How to move?" << std::endl;
+  std::cout << "How to move? ";
 
   bool is_error = false;
   do {
@@ -172,10 +204,27 @@ void __get_move_input(std::vector<DiagCell>& moves) {
       case 3: moves.push_back(DiagCell::DC_2); break;
       case 1: moves.push_back(DiagCell::DC_3); break;
       default:
-        std::cout << "ERROR INPUT! INPUT AGAIN!" << std::endl;
+        std::cout << "ERROR INPUT[7, 9, 3, 1]! INPUT AGAIN! ";
         is_error = true;
       }
     }
   } while (is_error);
 
+}
+
+void __print_capture(Player* _p0, Player* _p1) {
+  printf("Player: [%s]'s token %02d/%02d -- ", TK2STR(_p0->type()),
+      _p0->n_token(), _p0->N_token());
+
+  for (int i = 0; i < _p0->N_token(); ++i)
+    if (nullptr == _p0->token(i)) printf("%02d ", i);
+  std::cout << std::endl;
+
+  printf("Player: [%s]'s token %02d/%02d -- ", TK2STR(_p1->type()),
+      _p1->n_token(), _p1->N_token());
+
+  for (int i = 0; i < _p1->N_token(); ++i)
+    if (nullptr == _p1->token(i)) printf("%02d ", i);
+
+  std::cout << std::endl;
 }

@@ -19,6 +19,10 @@ public:
 public:
   TokenType type() const { return idx_; }
 
+  ///! the remain tokens.
+  const int n_token() const;
+  ///! the total tokens.
+  const int N_token() const;
   ///! the token handle
   const Token* token(int _no) const;
   Token* token(int _no);
