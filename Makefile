@@ -1,10 +1,14 @@
-all: checker
+CC=g++
+CFLAGS=-O3
+EXTRAFLAGS=-lpqxx -lpq
 
-checker:
-	g++ -Iinclude -std=c++11 main.cpp src/board.cpp src/player.cpp src/token.cpp src/master.cpp -o checker
+all: test
+
+test: main.cpp exerciser.h exerciser.cpp query_funcs.h query_funcs.cpp
+	$(CC) $(CFLAGS) -o test main.cpp exerciser.cpp query_funcs.cpp $(EXTRAFLAGS)
 
 clean:
-	rm -f *~ *.o checker
+	rm -f *~ *.o test
 
 clobber:
 	rm -f *~ *.o
