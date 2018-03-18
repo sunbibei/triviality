@@ -1,7 +1,7 @@
 #include <string>
 #include <fstream>
 #include <iostream>
-#include <stringstream>
+#include <sstream>
 #include <pqxx/pqxx>
 
 #include "exerciser.h"
@@ -14,7 +14,6 @@ bool __load_player(connection*, const std::string&);
 bool __load_team(connection*, const std::string&);
 bool __load_state(connection*, const std::string&);
 bool __load_color(connection*, const std::string&);
-
 
 int main (int argc, char *argv[]) 
 {
@@ -57,60 +56,87 @@ int main (int argc, char *argv[])
 
 
 void __create_table(connection* C) {
-  char* player = "CREATE TABLE PLAYER("  \
-      "PLAYER_ID INT PRIMARY KEY  NOT NULL," \
-      "TEAM_ID               INT  NOT NULL," \
-      "UNIFORM_NUM           INT  NOT NULL," \
-      "FIRST_NAME            CHAR(32)," \
-      "LAST_NAME             CHAR(32)," \
-      "MPG                   REAL," \
-      "PPG                   REAL," \
-      "RPG                   REAL," \
-      "APG                   REAL," \
-      "SPG                   REAL," \
-      "BPG                   REAL );";
-   /* Create a transactional object. */
-  work W1(C);
-  /* Execute SQL query */
-  W1.exec( player );
-  W1.commit();
+  /* Create a transactional object. */
+  work _dw(*C);
+  ///! delete the all of table.
+  std::string command = "DROP TABLE PLAYER;";
+  _dw.exec(command);
 
-  char* team = "CREATE TABLE TEAM("  \
-      "TEAM_ID INT PRIMARY KEY   NOT NULL," \
-      "NAME                TEXT  NOT NULL," \
-      "STATE_ID            INT   NOT NULL," \
-      "COLOR_ID            INT," \
-      "WINS                INT," \
+  command = "DROP TABLE TEAM;";
+  _dw.exec(command);
+
+  command = "DROP TABLE STATE;";
+  _dw.exec(command);
+
+  command = "DROP TABLE COLOR;";
+  _dw.exec(command);
+
+  ///! commit
+  _dw.commit();
+
+  ///! create the new table.
+  work _cw(*C);
+  command = std::string("CREATE TABLE PLAYER(") +
+      "PLAYER_ID INT PRIMARY KEY  NOT NULL," +
+      "TEAM_ID               INT  NOT NULL," +
+      "UNIFORM_NUM           INT  NOT NULL," +
+      "FIRST_NAME            TEXT," +
+      "LAST_NAME             TEXT," +
+      "MPG                   INT," +
+      "PPG                   INT," +
+      "RPG                   INT," +
+      "APG                   INT," +
+      "SPG                   DOUBLE PRECISION," +
+      "BPG                   DOUBLE PRECISION );";
+  _cw.exec(command);
+   /* Create a transactional object. */
+  // work W(*C);
+  /* Execute SQL query */
+//  try{
+//    W1.exec( command );
+//    // W1.commit();
+//  } catch (const std::exception &e){
+//    cerr << e.what() << std::endl;
+//  }
+
+
+  command = std::string("CREATE TABLE TEAM(")  +
+      "TEAM_ID INT PRIMARY KEY   NOT NULL," +
+      "NAME                TEXT  NOT NULL," +
+      "STATE_ID            INT   NOT NULL," +
+      "COLOR_ID            INT," +
+      "WINS                INT," +
       "LOSSES              INT);";
+  _cw.exec(command);
    /* Create a transactional object. */
-  work W2(C);
+  // work W2(*C);
   /* Execute SQL query */
-  W2.exec( team );
-  W2.commit();
+  // W.exec( command );
+  // W2.commit();
 
-  char* state = "CREATE TABLE STATE("  \
-      "STATE_ID INT PRIMARY KEY  NOT NULL," \
+  command = std::string("CREATE TABLE STATE(")  +
+      "STATE_ID INT PRIMARY KEY  NOT NULL," +
       "NAME                 TEXT NOT NULL );";
    /* Create a transactional object. */
-  work W3(C);
+  // work W3(*C);
   /* Execute SQL query */
-  W3.exec( state );
-  W3.commit();
+  _cw.exec( command );
+  // W3.commit();
 
-  char* color = "CREATE TABLE COLOR("  \
-      "COLOR_ID INT PRIMARY KEY  NOT NULL," \
+  command = std::string("CREATE TABLE COLOR(")  +
+      "COLOR_ID INT PRIMARY KEY  NOT NULL," +
       "NAME                 TEXT NOT NULL );";
    /* Create a transactional object. */
-  work W4(C);
+  // work W4(*C);
   /* Execute SQL query */
-  W4.exec( color );
-  W4.commit();
+  _cw.exec( command );
+  _cw.commit();
 }
 
 bool __load_player(connection* C, const std::string& filename) {
-  std::ofstream _of(filename);
-  if (!_of.is_open()) {
-    std::cout << "Can't read the file[" << filename << << "]!" std::endl;
+  std::ifstream _fi(filename);
+  if (!_fi.is_open()) {
+    std::cout << "Can't read the file[" << filename << "]!" << std::endl;
     return false;
   }
 
@@ -118,130 +144,163 @@ bool __load_player(connection* C, const std::string& filename) {
   int int_buf   = 0;
   double db_buf = 0;
   std::string str_buf;
-  while (!_of.eof()) {
-    ss << "INSERT INTO PLAYER(PLAYER_ID, TEAM_ID, UNIFORM_NUM, FIRST_NAME, LAST_NAME, MPG, PPG,
-RPG, APG, SPG, BPG) ";
+  work W(*C);
+  while (true) {
+    ss << "INSERT INTO PLAYER(PLAYER_ID, TEAM_ID, UNIFORM_NUM, FIRST_NAME, LAST_NAME, MPG, PPG, RPG, APG, SPG, BPG) ";
     ss << "VALUES (";
     ///! player id
-    _of >> int_buf; ss << int_buf; ss << ", ";
+    _fi >> int_buf; ss << int_buf; ss << ", ";
     ///! team id
-    _of >> int_buf; ss << int_buf; ss << ", ";
+    _fi >> int_buf; ss << int_buf; ss << ", ";
     ///! uniform num
-    _of >> int_buf; ss << int_buf; ss << ", ";
+    _fi >> int_buf; ss << int_buf; ss << ", ";
     ///! first name
-    _of >> str_buf; ss << "'"; ss << str_buf; ss << "'"; ss << ", ";
+    _fi >> str_buf;
+    if (std::string::npos != str_buf.find('\'')) {
+      auto p = str_buf.find('\'');
+      str_buf.insert(p, "\'");
+    }
+    ss << "'"; ss << str_buf; ss << "'"; ss << ", ";
     ///! last name
-    _of >> str_buf; ss << "'"; ss << str_buf; ss << "'"; ss << ", ";
+    _fi >> str_buf;
+    if (std::string::npos != str_buf.find('\'')) {
+      auto p = str_buf.find('\'');
+      str_buf.insert(p, "\'");
+    }
+    ss << "'"; ss << str_buf; ss << "'"; ss << ", ";
     ///! MPG
-    _of >> db_buf;  ss << db_buf; ss << ", ";
+    _fi >> db_buf;  ss << db_buf; ss << ", ";
     ///! PPG
-    _of >> db_buf;  ss << db_buf; ss << ", ";
+    _fi >> db_buf;  ss << db_buf; ss << ", ";
     ///! RPG
-    _of >> db_buf;  ss << db_buf; ss << ", ";
+    _fi >> db_buf;  ss << db_buf; ss << ", ";
     ///! APG
-    _of >> db_buf;  ss << db_buf; ss << ", ";
+    _fi >> db_buf;  ss << db_buf; ss << ", ";
     ///! SPG
-    _of >> db_buf;  ss << db_buf; ss << ", ";
+    _fi >> db_buf;  ss << db_buf; ss << ", ";
     ///! BPG
-    _of >> db_buf;  ss << db_buf;
+    _fi >> db_buf;  ss << db_buf;
     ss << "); ";
+
+    if (_fi.eof()) break;
+    str_buf = ss.str();
+    ss.str("");
+    W.exec( str_buf );
   }
-  /* Create a transactional object. */
-  work W(C);
-  
-  /* Execute SQL query */
-  W.exec( ss.str() );
   W.commit();
+
+  return true;
 }
 
 bool __load_team(connection* C, const std::string& filename) {
-  std::ofstream _of(filename);
-  if (!_of.is_open()) {
-    std::cout << "Can't read the file[" << filename << << "]!" std::endl;
+  std::ifstream _fd(filename);
+  if (!_fd.is_open()) {
+    std::cout << "Can't read the file[" << filename << "]!" << std::endl;
     return false;
   }
 
+  work W(*C);
   int int_buf   = 0;
   std::stringstream ss;
   std::string str_buf;
-  while (!_of.eof()) {
+  while (true) {
     ss << "INSERT INTO TEAM(TEAM_ID, NAME, STATE_ID, COLOR_ID, WINS, LOSSES) ";
     ss << "VALUES (";
     ///! TEAM_ID
-    _of >> int_buf; ss << int_buf; ss << ", ";
+    _fd >> int_buf; ss << int_buf; ss << ", ";
     ///! name
-    _of >> str_buf; ss << "'"; ss << str_buf; ss << "'"; ss << ", ";
+    _fd >> str_buf;
+    if (std::string::npos != str_buf.find('\'')) {
+      auto p = str_buf.find('\'');
+      str_buf.insert(p, "\'");
+    }
+    ss << "'"; ss << str_buf; ss << "'"; ss << ", ";
     ///! STATE_ID
-    _of >> int_buf; ss << int_buf; ss << ", ";
+    _fd >> int_buf; ss << int_buf; ss << ", ";
     ///! COLOR_ID
-    _of >> int_buf; ss << int_buf; ss << ", ";
+    _fd >> int_buf; ss << int_buf; ss << ", ";
     ///! WINS
-    _of >> int_buf; ss << int_buf; ss << ", ";
+    _fd >> int_buf; ss << int_buf; ss << ", ";
     ///! LOSSES
-    _of >> int_buf; ss << int_buf;
+    _fd >> int_buf; ss << int_buf;
     ss << "); ";
-  }
 
-  /* Create a transactional object. */
-  work W(C);
+    if (_fd.eof()) break;
+    str_buf = ss.str();
+    ss.str("");
+    W.exec( str_buf );
+  }
   
-  /* Execute SQL query */
-  W.exec( ss.str() );
   W.commit();
+  return true;
 }
 
 bool __load_state(connection* C, const std::string& filename) {
-  std::ofstream _of(filename);
-  if (!_of.is_open()) {
-    std::cout << "Can't read the file[" << filename << << "]!" std::endl;
+  std::ifstream _fd(filename);
+  if (!_fd.is_open()) {
+    std::cout << "Can't read the file[" << filename << "]!" << std::endl;
     return false;
   }
 
+  work W(*C);
   int int_buf = 0;
   std::stringstream ss;
   std::string str_buf;
-  while (!_of.eof()) {
+  while (true) {
     ss << "INSERT INTO STATE(STATE_ID, NAME) ";
     ss << "VALUES (";
     ///! STATE_ID
-    _of >> int_buf; ss << int_buf; ss << ", ";
+    _fd >> int_buf; ss << int_buf; ss << ", ";
     ///! NAME
-    _of >> str_buf; ss << "'"; ss << str_buf; ss << "'";
+    _fd >> str_buf;
+    if (std::string::npos != str_buf.find('\'')) {
+      auto p = str_buf.find('\'');
+      str_buf.insert(p, "\'");
+    }
+    ss << "'"; ss << str_buf; ss << "'";
     ss << "); ";
-  }
 
-  /* Create a transactional object. */
-  work W(C);
+    if (_fd.eof()) break;
+    str_buf = ss.str();
+    ss.str("");
+    W.exec( str_buf );
+  }
   
-  /* Execute SQL query */
-  W.exec( ss.str() );
   W.commit();
+  return true;
 }
 
 bool __load_color(connection* C, const std::string& filename) {
-  std::ofstream _of(filename);
-  if (!_of.is_open()) {
-    std::cout << "Can't read the file[" << filename << << "]!" std::endl;
+  std::ifstream _fd(filename);
+  if (!_fd.is_open()) {
+    std::cout << "Can't read the file[" << filename << "]!" << std::endl;
     return false;
   }
 
+  work W(*C);
   int int_buf = 0;
   std::stringstream ss;
   std::string str_buf;
-  while (!_of.eof()) {
+  while (!_fd.eof()) {
     ss << "INSERT INTO COLOR(COLOR_ID, NAME) ";
     ss << "VALUES (";
     ///! COLOR_ID
-    _of >> int_buf; ss << int_buf; ss << ", ";
+    _fd >> int_buf; ss << int_buf; ss << ", ";
     ///! NAME
-    _of >> str_buf; ss << "'"; ss << str_buf; ss << "'";
+    _fd >> str_buf;
+    if (std::string::npos != str_buf.find('\'')) {
+      auto p = str_buf.find('\'');
+      str_buf.insert(p, "\'");
+    }
+    ss << "'"; ss << str_buf; ss << "'";
     ss << "); ";
-  }
 
-  /* Create a transactional object. */
-  work W(C);
+    if (_fd.eof()) break;
+    str_buf = ss.str();
+    ss.str("");
+    W.exec( str_buf );
+  }
   
-  /* Execute SQL query */
-  W.exec( ss.str() );
   W.commit();
+  return true;
 }
