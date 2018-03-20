@@ -14,12 +14,16 @@ public abstract class Process implements Comparable<Process> {
   protected int id; /*** process ID */
   protected int priority; /*** priority (lower value means higher priority) */
 
-  protected int createdTime; /*** point in time the process was created */
-  protected int startedTime; /*** point in time 
-				the process was running for the first time */
-  protected int terminatedTime; /*** point in time the process terminated */
-  protected int blockedTime; /*** amount of time the process was blocked */
-  protected int cpuTime; /*** amount of time the process was running */
+  /*** point in time the process was created */
+  protected int createdTime;    
+  /*** point in time the process was running for the first time */
+  protected int startedTime;    
+  /*** point in time the process terminated */
+  protected int terminatedTime; 
+  /*** amount of time the process was blocked */
+  protected int blockedTime; 
+  /*** amount of time the process was running */
+  protected int cpuTime; 
 
   protected State state; /*** process state */
   
@@ -29,8 +33,7 @@ public abstract class Process implements Comparable<Process> {
   public int getWaitingTime() {
 
     // TODO
-    
-    return 0;
+    return (terminatedTime - createdTime - cpuTime - blockedTime);
   }
 
   /**
@@ -39,8 +42,7 @@ public abstract class Process implements Comparable<Process> {
   public int getTurnaroundTime() {
 
     // TODO
-    
-    return 0;
+    return (terminatedTime - createdTime);
   }
 
   /**
@@ -49,8 +51,7 @@ public abstract class Process implements Comparable<Process> {
   public int getResponseTime() {
 
     // TODO
-    
-    return 0;
+	return (startedTime - createdTime);
   }
 
   /**

@@ -1,4 +1,4 @@
-import java.util.Properties;
+import java.util.*;
 
 /**
  * Round Robin Scheduler
@@ -8,7 +8,22 @@ import java.util.Properties;
 public class RRScheduler extends AbstractScheduler {
 
   // TODO
-
+  private int time_quantum_        = 0;
+  private List<Process> pcb_queue_ = null;
+  /**
+   * Initializes the scheduler from the given parameters
+   */
+  public void initialize(Properties parameters) {
+    try {
+      time_quantum_ =
+          Integer.parseInt(parameters.getProperty("timeQuantum", "20"));
+    } catch(NumberFormatException e) {
+      System.err.println("timeQuantum not a number.");
+      System.exit(1);
+    }
+    
+    pcb_queue_ = new ArrayList<>();
+  }
   /**
    * Adds a process to the ready queue.
    * usedFullTimeQuantum is true if process is being moved to ready
@@ -17,7 +32,7 @@ public class RRScheduler extends AbstractScheduler {
   public void ready(Process process, boolean usedFullTimeQuantum) {
 
     // TODO
-
+    pcb_queue_.add(process);
   }
 
   /**
@@ -27,8 +42,18 @@ public class RRScheduler extends AbstractScheduler {
    */
   public Process schedule() {
 
-    // TODO
-
-    return null;
+    if (pcb_queue_.isEmpty()) return null;
+    
+    Process p = pcb_queue_.get(0);
+    pcb_queue_.remove(0);
+    return p;
+  }
+  
+  /**
+   * Returns the time quantum of this scheduler
+   * or -1 if the scheduler does not require a timer interrupt.
+   */
+  public int getTimeQuantum() {
+    return time_quantum_;
   }
 }

@@ -125,7 +125,7 @@ public class BurstProcess extends Process {
       return null;
     } else {
       if (startedTime < 0)
-	startedTime = currentTime;
+        startedTime = currentTime;
     }
     
     int burst = nextBurst(currentTime);
