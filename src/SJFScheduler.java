@@ -1,6 +1,7 @@
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.Vector;
 
 /**
  * Shortest Job First Scheduler
@@ -8,17 +9,17 @@ import java.util.Properties;
  * @version 2017
  */
 public class SJFScheduler extends AbstractScheduler {
-
-  // TODO
-  private double tau_    = 0;
-  private double alpha_  = 0;
+  
+  private double tau_[] = null;
+  private double alpha_ = 0;
   private List<Process> pcb_queue_ = null;
   /**
    * Initializes the scheduler from the given parameters
    */
   public void initialize(Properties parameters) {
+    double _tau = 10;
     try {
-      tau_   =
+      _tau   =
           Double.parseDouble(parameters.getProperty("initialBurstEstimate", "10"));
       alpha_ =
           Double.parseDouble(parameters.getProperty("alphaBurstEstimate", "10"));
@@ -28,6 +29,9 @@ public class SJFScheduler extends AbstractScheduler {
     }
     
     pcb_queue_ = new ArrayList<>();
+    tau_ = new double[1024]; ///! The default maximum number of process is 1024
+    for (int i = 0; i < tau_.length; ++i)
+      tau_[i] = _tau;
   }
   
   /**
@@ -49,18 +53,19 @@ public class SJFScheduler extends AbstractScheduler {
     double burst = Double.MAX_VALUE;
     for (int idx = 0; idx < pcb_queue_.size(); ++idx) {
       BurstProcess _p = (BurstProcess) pcb_queue_.get(idx);
-      tau_ = alpha_ * _p.getRecentBurst() + (1 - alpha_) * tau_;
+      double _tau = alpha_ * _p.getRecentBurst() + (1 - alpha_) * tau_[_p.getId()];
       
-      if (tau_ < burst) {
+      if (_tau < burst) {
         sjf   = idx;
-        burst = tau_;
+        burst = _tau;
       }
     }
     if (-1 == sjf) return null;
     
-    Process ret = pcb_queue_.get(sjf);
+    BurstProcess ret = (BurstProcess) pcb_queue_.get(sjf);
+    tau_[ret.getId()] = alpha_ * ret.getRecentBurst() + (1 - alpha_) * tau_[ret.getId()];
     pcb_queue_.remove(sjf);
-    System.out.println("Scheduler selects process " + ret);
+    // System.out.println("Scheduler selects process " + ret);
     return ret;
   }
 }

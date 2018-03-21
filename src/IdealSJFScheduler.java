@@ -43,7 +43,7 @@ public class IdealSJFScheduler extends AbstractScheduler {
   	
   	Process ret = pcb_queue_.get(sjf);
   	pcb_queue_.remove(sjf);
-    System.out.println("Scheduler selects process " + ret);
+    // System.out.println("Scheduler selects process " + ret);
     return ret;
   }
 }

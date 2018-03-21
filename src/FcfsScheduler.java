@@ -31,7 +31,7 @@ public class FcfsScheduler extends AbstractScheduler {
    * Returns null if there is no process to run.
    */
   public Process schedule() {
-    System.out.println("Scheduler selects process "+readyQueue.peek());
+    // System.out.println("Scheduler selects process "+readyQueue.peek());
     return readyQueue.poll();
   }
 }
